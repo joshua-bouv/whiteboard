@@ -1,0 +1,72 @@
+.whiteboard {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+}
+
+.colors {
+    position: fixed;
+    display: inline;
+}
+
+.buttons {
+    position: fixed;
+    display: inline;
+    margin-top: 200px;
+}
+
+.color {
+    height: 25px;
+    width: 25px;
+}
+
+.button {
+    height: 25px;
+    width: 25px;
+}
+
+.color.black {
+    background-color: black;
+    cursor: pointer;
+}
+.color.red {
+    background-color: #e74c3c;
+    cursor: pointer;
+}
+.color.green {
+    background-color: #27ae60;
+    cursor: pointer;
+}
+.color.blue {
+    background-color: #2980b9;
+    cursor: pointer;
+}
+.color.purple {
+    background-color: #9b59b6;
+    cursor: pointer;
+}
+.color.grey {
+    background-color: #95a5a6;
+    cursor: pointer;
+}
+.color.yellow {
+    background-color: #f1c40f;
+    cursor: pointer;
+}
+
+.button.tools {
+    display: block;
+    background-color: #3498db;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.button.tools:hover {
+    background-color: #2980b9;
+}
