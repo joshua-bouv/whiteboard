@@ -8,13 +8,15 @@ const Board = () => {
     let room = "room1";
     let color = 'black';
     let lineSize = 5;
-
+    let lines = []
 
     useEffect(() => {
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
         const colorElements = document.getElementsByClassName('color');
         const current = {};
+        let holdingLine = [];
+        holdingLine['self'] = [];
 
         const getColorHex = [];
         getColorHex['black'] = '#000000';
@@ -32,7 +34,7 @@ const Board = () => {
         let isDrawing = false;
 
         // What draws the lines on the whiteboard
-        const drawLine = (xStart, yStart, xEnd, yEnd, color, emit) => {
+        const drawLine = (xStart, yStart, xEnd, yEnd, color, user, addToHolding, emit) => {
             context.beginPath();
             context.moveTo(xStart, yStart); // A line is lots of little lines
             context.lineTo(xEnd, yEnd);
@@ -40,7 +42,9 @@ const Board = () => {
             context.lineWidth = lineSize;
             context.stroke();
 
-            // add to holding line (todo)
+            if (addToHolding) {
+                holdingLine[user].push({xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color})
+            }
 
             if (!emit) { return; }
             const w = canvas.width;
@@ -77,7 +81,7 @@ const Board = () => {
         // For drawing whilst moving the mouse
         const onMouseMove = (e) => {
             if (!isDrawing) { return; }
-            drawLine(current.x, current.y, e.clientX, e.clientY, color, true);
+            drawLine(current.x, current.y, e.clientX, e.clientY, color, 'self', true, true);
             current.x = e.clientX;
             current.y = e.clientY;
         };
@@ -89,7 +93,17 @@ const Board = () => {
             if (!isDrawing) { return; }
             isDrawing = false;
             // move holding line with all the sub lines to main line, allowing for an undo
-            drawLine(current.x, current.y, e.clientX, e.clientY, color, true);
+            drawLine(current.x, current.y, e.clientX, e.clientY, color, 'self', true,true);
+            lines.push(holdingLine['self'])
+            holdingLine['self'] = []
+            socketRef.current.emit('lineCompleted', room);
+        };
+
+        const onMouseUpExt = (data) => {
+            console.log(lines)
+            lines.push(holdingLine[data.user])
+            console.log(lines)
+            holdingLine[data.user] = []
         };
 
         canvas.addEventListener('mouseup', onMouseUp, false);
@@ -98,28 +112,51 @@ const Board = () => {
 
         // Draws on the whiteboard from incoming net messages
         const onDrawingEvent = (data) => {
+            if (holdingLine[data.user] == null) {
+                holdingLine[data.user] = []
+            }
             const w = canvas.width;
             const h = canvas.height;
-            drawLine(data.xStart * w, data.yStart * h, data.xEnd * w, data.yEnd * h, data.color, false);
+            drawLine(data.xStart * w, data.yStart * h, data.xEnd * w, data.yEnd * h, data.color, data.user, true,false);
         };
 
         // Clears the whiteboard
         const onClearEvent = () => {
             context.clearRect(0, 0, canvas.width, canvas.height)
+            lines = []
         };
+
+        const onUndoEvent = () => {
+            context.clearRect(0, 0, canvas.width, canvas.height)
+            lines.pop()
+            let i;
+            let j;
+            for (i = 0; i < lines.length; i++) {
+                for (j = 0; j < lines[i].length; j++) {
+                    drawLine(lines[i][j].xStart, lines[i][j].yStart, lines[i][j].xEnd, lines[i][j].yEnd, lines[i][j].color, 'self', false, false)
+                }
+            }
+        }
 
         // socket net messages
         socketRef.current = io.connect(':8080/');
         socketRef.current.on('drawing', onDrawingEvent);
         socketRef.current.on('clear', onClearEvent);
+        socketRef.current.on('undo', onUndoEvent);
+        socketRef.current.on('lineCompleted', onMouseUpExt);
         socketRef.current.emit('joinRoom', room);
-    }, [room]);
+    });
 
     // Clear whiteboard button
      function clearWhiteboard() {
          canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
          socketRef.current.emit('clear', room);
      }
+
+    // Undo draw button
+    function undoDraw() {
+        socketRef.current.emit('undo', room);
+    }
 
      // temp room system
     function room1() {
@@ -149,6 +186,7 @@ const Board = () => {
 
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
             <div className="buttons">
+                <button className="button tools" onClick={undoDraw}><i className="fa fa-undo"/></button>
                 <button className="button tools" onClick={clearWhiteboard}><i className="fa fa-trash"/></button>
                 <button className="button tools" onClick={room1}>1</button>
                 <button className="button tools" onClick={room2}>2</button>
