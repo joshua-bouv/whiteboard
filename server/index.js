@@ -1,17 +1,15 @@
 const app = require('express')();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-
 const {MongoClient} = require('mongodb');
 
 async function main(){
-    const uri = "mongodb+srv://whiteboard:siEuqzAie1kGjgi8@cluster0.nlqhr.mongodb.net/whiteboards?retryWrites=true&w=majority";
-    const client = new MongoClient(uri);
+    const client = new MongoClient("mongodb+srv://whiteboard:siEuqzAie1kGjgi8@cluster0.nlqhr.mongodb.net/whiteboards?retryWrites=true&w=majority");
 
     try {
         await client.connect();
         const whiteboards = client.db("whiteboards");
-        let holdingLine = []
+        let holdingLine = [] // needs improving for a board-by-board basis aswell rather than globally per user
 
         async function addLineToBoard(board, author, line) {
             try {
@@ -77,9 +75,19 @@ async function main(){
                 holdingLine[socket.id] = [];
                 sendWhiteboardToClient("example", socket);
             });
+
+            // To create whiteboard
+            socket.on('createRoom', () => {
+                socket.leaveAll();
+                // generate new ID for whiteboard
+                //socket.join(room);
+                holdingLine[socket.id] = [];
+                // create collection in database of whiteboard
+                // give user permission to access whiteboard if required
+            });
         });
 
-        http.listen(8080,() => console.log(`server active`));
+        http.listen(8080,() => console.log(`Whiteboard server active`));
     } catch (e) {
         console.error(e);
     }
