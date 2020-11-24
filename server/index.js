@@ -9,11 +9,8 @@ async function main(){
     const client = new MongoClient(uri);
 
     try {
-        // Connect to the MongoDB cluster
         await client.connect();
-
         const whiteboards = client.db("whiteboards");
-
         let holdingLine = []
 
         async function addLineToBoard(board, author, line) {
@@ -29,7 +26,7 @@ async function main(){
                 whiteboards.collection(board).find({}).forEach(function(doc) {
                     let plots = doc.plots;
                     let j;
-                    for (j = 0; j <plots.length; j++) { // all the plots in the lines
+                    for (j = 0; j <plots.length; j++) {
                         let data = {}
                         data.xStart = plots[j].xStart
                         data.yStart = plots[j].yStart
@@ -57,14 +54,16 @@ async function main(){
             // To clear whiteboard across all clients
             socket.on('clear', (room) => {
                 socket.to(room).broadcast.emit('clear')
+                // handle database side
             });
 
             // To undo a change on the whiteboard
             socket.on('undo', (room) => {
                 io.in(room).emit('undo')
-                // handle undo serverside
+                // handle database side
             });
 
+            // To signify a line has been completed by a client and to add to the database
             socket.on('lineCompleted', (room) => {
                 addLineToBoard("example", socket.id, holdingLine[socket.id])
                 holdingLine[socket.id] = []
@@ -74,7 +73,7 @@ async function main(){
             // To change whiteboard
             socket.on('joinRoom', (room) => {
                 socket.leaveAll();
-                socket.join(room)
+                socket.join(room);
                 holdingLine[socket.id] = [];
                 sendWhiteboardToClient("example", socket);
             });
