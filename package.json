@@ -9,6 +9,7 @@
     "esm": "^3.2.25",
     "express": "latest",
     "mongodb": "^3.6.3",
+    "mongoose": "^5.10.15",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-scripts": "3.4.3",

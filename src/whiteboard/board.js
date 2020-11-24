@@ -131,8 +131,8 @@ const Board = () => {
             lines.pop()
             let i;
             let j;
-            for (i = 0; i < lines.length; i++) {
-                for (j = 0; j < lines[i].length; j++) {
+            for (i = 0; i < lines.length; i++) { // all the lines
+                for (j = 0; j < lines[i].length; j++) { // all the plots in the lines
                     drawLine(lines[i][j].xStart, lines[i][j].yStart, lines[i][j].xEnd, lines[i][j].yEnd, lines[i][j].color, 'self', false, false)
                 }
             }
