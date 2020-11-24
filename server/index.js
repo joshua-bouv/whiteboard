@@ -46,7 +46,7 @@ async function main(){
             socket.on('drawing', (data) => {
                 data['user'] = socket.id
                 socket.to(data.room).broadcast.emit('drawing', data)
-                holdingLine[socket.id].push({user:socket.id, xStart:data.xStart, yStart:data.yStart, xEnd:data.xEnd, yEnd:data.yEnd, color:data.color})
+                holdingLine[socket.id].push({xStart:data.xStart, yStart:data.yStart, xEnd:data.xEnd, yEnd:data.yEnd, color:data.color})
             });
 
             // To clear whiteboard across all clients
