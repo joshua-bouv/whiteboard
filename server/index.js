@@ -13,30 +13,59 @@ async function main(){
 
         async function addLineToBoard(board, author, line) {
             try {
-                await whiteboards.collection(board).insertOne({author: author, plots: line});
-            }catch (e) {
+                await whiteboards.collection(board).insertOne({author: author, plots: line, time: new Date().getTime()});
+            } catch (e) {
                 console.error(e)
             }
         }
 
-        async function sendWhiteboardToClient(board, socket) {
+        async function clearBoard(board) {
+            try {
+                await whiteboards.collection(board).deleteMany({});
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        async function undoBoard(board) {
+            try {
+                await whiteboards.collection(board).findOneAndDelete({}, {$max: "time"}, {})
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+        function makeid(length) {
+            let result = '';
+            let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let charactersLength = characters.length;
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * charactersLength));
+            }
+            return result;
+        }
+
+        async function sendWhiteboardToClient(board, socket, room) {
             try {
                 whiteboards.collection(board).find({}).forEach(function(doc) {
                     let plots = doc.plots;
                     let j;
-                    for (j = 0; j <plots.length; j++) {
+                    for (j = 0; j < plots.length; j++) {
                         let data = {}
                         data.xStart = plots[j].xStart
                         data.yStart = plots[j].yStart
                         data.xEnd = plots[j].xEnd
                         data.yEnd = plots[j].yEnd
                         data.color = plots[j].color
+                        data.user = socket.id
                         socket.emit('drawing', data)
                     }
+                    socket.emit('lineCompleted', {user:socket.id})
                 }, function(err) {
                     console.log(err)
                 });
-            }catch (e) {
+            } catch (e) {
                 console.error(e)
             }
         }
@@ -52,13 +81,13 @@ async function main(){
             // To clear whiteboard across all clients
             socket.on('clear', (room) => {
                 socket.to(room).broadcast.emit('clear')
-                // handle database side
+                clearBoard("example")
             });
 
             // To undo a change on the whiteboard
             socket.on('undo', (room) => {
                 io.in(room).emit('undo')
-                // handle database side
+                undoBoard("example")
             });
 
             // To signify a line has been completed by a client and to add to the database
@@ -73,16 +102,16 @@ async function main(){
                 socket.leaveAll();
                 socket.join(room);
                 holdingLine[socket.id] = [];
-                sendWhiteboardToClient("example", socket);
+                sendWhiteboardToClient("example", socket, room);
             });
 
             // To create whiteboard
             socket.on('createRoom', () => {
                 socket.leaveAll();
-                // generate new ID for whiteboard
-                //socket.join(room);
+                let newWhiteboard = makeid(9);
+                socket.join(newWhiteboard);
                 holdingLine[socket.id] = [];
-                // create collection in database of whiteboard
+                whiteboards.createCollection(newWhiteboard)
                 // give user permission to access whiteboard if required
             });
         });

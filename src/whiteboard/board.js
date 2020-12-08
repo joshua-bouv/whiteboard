@@ -5,6 +5,7 @@ import '../styles/board.css';
 const Board = () => {
     const canvasRef = useRef(null);
     const socketRef = useRef();
+    const roomRef = useRef(null);
     let room = "room1";
     let color = 'black';
     let lineSize = 5;
@@ -100,9 +101,7 @@ const Board = () => {
         };
 
         const onMouseUpExt = (data) => {
-            console.log(lines)
             lines.push(holdingLine[data.user])
-            console.log(lines)
             holdingLine[data.user] = []
         };
 
@@ -171,6 +170,14 @@ const Board = () => {
         socketRef.current.emit('joinRoom', room);
     }
 
+    function createRoom() {
+        socketRef.current.emit('createRoom', room);
+    }
+
+    function joinRoom() {
+         socketRef.current.emit('joinRoom', roomRef.current.value);
+    }
+
     return (
         <div>
             <canvas ref={canvasRef} className="whiteboard" />
@@ -190,6 +197,9 @@ const Board = () => {
                 <button className="button tools" onClick={clearWhiteboard}><i className="fa fa-trash"/></button>
                 <button className="button tools" onClick={room1}>1</button>
                 <button className="button tools" onClick={room2}>2</button>
+                <button className="button tools" onClick={createRoom}>+</button>
+                <textarea ref={roomRef} defaultValue='test'></textarea>
+                <button className="button tools" onClick={joinRoom}>J</button>
             </div>
         </div>
     );
