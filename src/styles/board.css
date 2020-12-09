@@ -67,6 +67,16 @@
     cursor: pointer;
 }
 
+.button.toolsL {
+    display: block;
+    background-color: #3498db;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    width: 130px;
+}
+
 .button.tools:hover {
     background-color: #2980b9;
 }

@@ -15,9 +15,9 @@ async function main(){
         const whiteboards = client.db("whiteboards");
         let holdingLine = []; // needs improving for a board-by-board basis aswell rather than globally per user
 
-        async function addLineToBoard(board, author, line) {
+        async function addLineToBoard(board, author, plots, type) {
             try {
-                await whiteboards.collection(board).insertOne({author: author, plots: line, time: new Date().getTime()});
+                await whiteboards.collection(board).insertOne({author: author, plots: plots, type: type});
             } catch (e) {
                 console.error(e)
             }
@@ -96,7 +96,7 @@ async function main(){
 
             // To signify a line has been completed by a client and to add to the database
             socket.on('lineCompleted', (room) => {
-                addLineToBoard("example", socket.id, holdingLine[socket.id]);
+                addLineToBoard("example", socket.id, holdingLine[socket.id], "line");
                 holdingLine[socket.id] = [];
                 socket.to(room).broadcast.emit('lineCompleted', {user:socket.id})
             });
@@ -116,8 +116,8 @@ async function main(){
             // To create whiteboard
             socket.on('createRoom', () => {
                 let newWhiteboard = makeid(9);
+                whiteboards.createCollection(newWhiteboard);
                 addPlayerToRoom(newWhiteboard);
-                whiteboards.createCollection(newWhiteboard)
                 // give user permission to access whiteboard if required
             });
         });
