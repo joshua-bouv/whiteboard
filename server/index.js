@@ -9,7 +9,7 @@ async function main(){
     try {
         await client.connect();
         const whiteboards = client.db("whiteboards");
-        let holdingLine = [] // needs improving for a board-by-board basis aswell rather than globally per user
+        let holdingLine = []; // needs improving for a board-by-board basis aswell rather than globally per user
 
         async function addLineToBoard(board, author, line) {
             try {
@@ -29,7 +29,7 @@ async function main(){
 
         async function undoBoard(board) {
             try {
-                await whiteboards.collection(board).findOneAndDelete({}, {$max: "time"}, {})
+                await whiteboards.collection(board).findOneAndDelete({}, {sort: {_id: -1}})
             } catch (e) {
                 console.error(e)
             }
@@ -52,13 +52,13 @@ async function main(){
                     let plots = doc.plots;
                     let j;
                     for (j = 0; j < plots.length; j++) {
-                        let data = {}
-                        data.xStart = plots[j].xStart
-                        data.yStart = plots[j].yStart
-                        data.xEnd = plots[j].xEnd
-                        data.yEnd = plots[j].yEnd
-                        data.color = plots[j].color
-                        data.user = socket.id
+                        let data = {};
+                        data.xStart = plots[j].xStart;
+                        data.yStart = plots[j].yStart;
+                        data.xEnd = plots[j].xEnd;
+                        data.yEnd = plots[j].yEnd;
+                        data.color = plots[j].color;
+                        data.user = socket.id;
                         socket.emit('drawing', data)
                     }
                     socket.emit('lineCompleted', {user:socket.id})
@@ -73,44 +73,46 @@ async function main(){
         io.on('connection', socket => {
             // To draw whiteboard across all clients
             socket.on('drawing', (data) => {
-                data['user'] = socket.id
-                socket.to(data.room).broadcast.emit('drawing', data)
+                data['user'] = socket.id;
+                socket.to(data.room).broadcast.emit('drawing', data);
                 holdingLine[socket.id].push({xStart:data.xStart, yStart:data.yStart, xEnd:data.xEnd, yEnd:data.yEnd, color:data.color})
             });
 
             // To clear whiteboard across all clients
             socket.on('clear', (room) => {
-                socket.to(room).broadcast.emit('clear')
+                socket.to(room).broadcast.emit('clear');
                 clearBoard("example")
             });
 
             // To undo a change on the whiteboard
             socket.on('undo', (room) => {
-                io.in(room).emit('undo')
+                io.in(room).emit('undo');
                 undoBoard("example")
             });
 
             // To signify a line has been completed by a client and to add to the database
             socket.on('lineCompleted', (room) => {
-                addLineToBoard("example", socket.id, holdingLine[socket.id])
-                holdingLine[socket.id] = []
+                addLineToBoard("example", socket.id, holdingLine[socket.id]);
+                holdingLine[socket.id] = [];
                 socket.to(room).broadcast.emit('lineCompleted', {user:socket.id})
             });
 
-            // To change whiteboard
-            socket.on('joinRoom', (room) => {
+            function addPlayerToRoom(room) {
                 socket.leaveAll();
                 socket.join(room);
                 holdingLine[socket.id] = [];
+            }
+
+            // To change whiteboard
+            socket.on('joinRoom', (room) => {
+                addPlayerToRoom(room);
                 sendWhiteboardToClient("example", socket, room);
             });
 
             // To create whiteboard
             socket.on('createRoom', () => {
-                socket.leaveAll();
                 let newWhiteboard = makeid(9);
-                socket.join(newWhiteboard);
-                holdingLine[socket.id] = [];
+                addPlayerToRoom(newWhiteboard);
                 whiteboards.createCollection(newWhiteboard)
                 // give user permission to access whiteboard if required
             });
