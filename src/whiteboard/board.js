@@ -89,7 +89,7 @@ const Board = () => {
             context.strokeRect(xStart, yStart, xSize, ySize);
 
             if (addToHolding) {
-                holdingObject[user] = {type: "square", xStart: xStart, yStart: yStart, xSize: xSize, ySize: ySize, color: color} // add to canvas storage
+                holdingObject[user] = {type: "square", xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color} // add to canvas storage
             }
         };
 
@@ -222,7 +222,7 @@ const Board = () => {
                 if (whiteboardObjects[i].type === "circle") {
                     drawCircle(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].xEnd, whiteboardObjects[i].yEnd, whiteboardObjects[i].color, 'self', false, false)
                 } else if (whiteboardObjects[i].type === "square") {
-                    drawSquare(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].xSize, whiteboardObjects[i].ySize, whiteboardObjects[i].color, 'self', false, false)
+                    drawSquare(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].xEnd, whiteboardObjects[i].yEnd, whiteboardObjects[i].color, 'self', false, false)
                 } else if (whiteboardObjects[i].type === "text") {
                     drawText(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].color, whiteboardObjects[i].text, 'self', false, false)
                 } else if (whiteboardObjects[i][0].type === "line") {
