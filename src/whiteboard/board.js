@@ -5,12 +5,13 @@ import '../styles/board.css';
 const Board = () => {
     const canvasRef = useRef(null);
     const socketRef = useRef();
+    const textRef = useRef(null);
     const roomRef = useRef(null);
     let room = "room1";
     let color = 'black';
     let drawingType = "line";
     let lineSize = 5;
-    let lines = [];
+    let whiteboardObjects = [];
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -18,8 +19,8 @@ const Board = () => {
         const colorElements = document.getElementsByClassName('color');
         const current = {};
 
-        let holdingLine = []; // TEMP, MESSY BUT PROOF OF CONCEPT
-        holdingLine['self'] = [];
+        let holdingObject = []; // TEMP, MESSY BUT PROOF OF CONCEPT
+        holdingObject['self'] = [];
 
         let holdingCircle = []; // TEMP, MESSY BUT PROOF OF CONCEPT
         holdingCircle['self'] = [];
@@ -49,7 +50,7 @@ const Board = () => {
             context.stroke();
 
             if (addToHolding) {
-                holdingLine[user].push({xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color})
+                holdingObject[user].push({type: "line", xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color})
             }
 
             if (!emit) { return; }
@@ -70,20 +71,32 @@ const Board = () => {
             context.font = "30px Arial";
             context.fillStyle = color;
             context.fillText(text, xStart, yStart);
-        }
+
+            if (addToHolding) {
+                holdingObject[user] = {type: "text", xStart: xStart, yStart: yStart, text: text, color: color} // add to canvas storage
+            }
+        };
 
         const drawSquare = (xStart, yStart, xEnd, yEnd, color, user, addToHolding, emit) => {
-            redrawWhiteboard();
+            if (addToHolding) {
+                redrawWhiteboard();
+            }
 
             let xSize = xEnd - xStart;
             let ySize = yEnd - yStart;
 
             context.strokeStyle = color;
             context.strokeRect(xStart, yStart, xSize, ySize);
-        }
+
+            if (addToHolding) {
+                holdingObject[user] = {type: "square", xStart: xStart, yStart: yStart, xSize: xSize, ySize: ySize, color: color} // add to canvas storage
+            }
+        };
 
         const drawCircle = (xStart, yStart, xEnd, yEnd, color, user, addToHolding, emit) => {
-            redrawWhiteboard();
+            if (addToHolding) {
+                redrawWhiteboard();
+            }
 
             let radius;
             let xSize = xEnd - xStart;
@@ -108,7 +121,9 @@ const Board = () => {
             context.strokeStyle = color;
             context.stroke();
 
-            holdingCircle[user] = {xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color, radius: radius} // add to canvas storage
+            if (addToHolding) {
+                holdingObject[user] = {type: "circle", xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color, radius: radius} // add to canvas storage
+            }
         };
 
         // Sets the size of the whiteboard canvas
@@ -128,11 +143,11 @@ const Board = () => {
             current.x = e.clientX;
             current.y = e.clientY;
             if (drawingType === "circle") {
-                drawCircle(current.x, current.y, current.x+50, current.y+50, color, 'self', false, false)
+                drawCircle(current.x, current.y, current.x, current.y, color, 'self', true, false)
             } else if (drawingType === "text") {
-                drawText(current.x, current.y, color, "testing123", 'self', false, false)
+                drawText(current.x, current.y, color, textRef.current.value, 'self', true, false)
             } else if (drawingType === "square") {
-                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', false, false)
+                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', true, false)
             }
         }, false);
 
@@ -144,11 +159,11 @@ const Board = () => {
                 current.x = e.clientX;
                 current.y = e.clientY;
             } else if (drawingType === "circle") {
-                drawCircle(current.x, current.y, e.clientX, e.clientY, color, 'self', false, false)
+                drawCircle(current.x, current.y, e.clientX, e.clientY, color, 'self', true, false)
             } else if (drawingType === "text") {
 
             } else if (drawingType === "square") {
-                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', false, false)
+                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', true, false)
             }
         };
 
@@ -161,21 +176,24 @@ const Board = () => {
             if (drawingType === "line") {
                 // move holding line with all the sub lines to main line, allowing for an undo
                 drawLine(current.x, current.y, e.clientX, e.clientY, color, 'self', true,true);
-                lines.push(holdingLine['self']);
-                holdingLine['self'] = [];
+                whiteboardObjects.push(holdingObject['self']);
+                holdingObject['self'] = [];
                 socketRef.current.emit('lineCompleted', room);
             } else if (drawingType === "circle") {
-                // move to lines
+                whiteboardObjects.push(holdingObject['self']);
+                holdingObject['self'] = [];
             } else if (drawingType === "text") {
-
+                whiteboardObjects.push(holdingObject['self']);
+                holdingObject['self'] = [];
             } else if (drawingType === "square") {
-
+                whiteboardObjects.push(holdingObject['self']);
+                holdingObject['self'] = [];
             }
         };
 
         const onMouseUpExt = (data) => {
-            lines.push(holdingLine[data.user]);
-            holdingLine[data.user] = []
+            whiteboardObjects.push(holdingObject[data.user]);
+            holdingObject[data.user] = []
         };
 
         canvas.addEventListener('mouseup', onMouseUp, false);
@@ -184,8 +202,8 @@ const Board = () => {
 
         // Draws on the whiteboard from incoming net messages
         const onDrawingEvent = (data) => {
-            if (holdingLine[data.user] == null) {
-                holdingLine[data.user] = []
+            if (holdingObject[data.user] == null) {
+                holdingObject[data.user] = []
             }
             const w = canvas.width;
             const h = canvas.height;
@@ -194,23 +212,29 @@ const Board = () => {
 
         // Clears the whiteboard
         const onClearEvent = () => {
-            context.clearRect(0, 0, canvas.width, canvas.height)
-            lines = []
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            whiteboardObjects = []
         };
 
         const redrawWhiteboard = () => {
-            context.clearRect(0, 0, canvas.width, canvas.height)
-            let i;
-            let j;
-            for (i = 0; i < lines.length; i++) { // all the lines
-                for (j = 0; j < lines[i].length; j++) { // all the plots in the lines
-                    drawLine(lines[i][j].xStart, lines[i][j].yStart, lines[i][j].xEnd, lines[i][j].yEnd, lines[i][j].color, 'self', false, false)
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < whiteboardObjects.length; i++) { // all the objects
+                if (whiteboardObjects[i].type === "circle") {
+                    drawCircle(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].xEnd, whiteboardObjects[i].yEnd, whiteboardObjects[i].color, 'self', false, false)
+                } else if (whiteboardObjects[i].type === "square") {
+                    drawSquare(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].xSize, whiteboardObjects[i].ySize, whiteboardObjects[i].color, 'self', false, false)
+                } else if (whiteboardObjects[i].type === "text") {
+                    drawText(whiteboardObjects[i].xStart, whiteboardObjects[i].yStart, whiteboardObjects[i].color, whiteboardObjects[i].text, 'self', false, false)
+                } else if (whiteboardObjects[i][0].type === "line") {
+                    for (let j = 0; j < whiteboardObjects[i].length; j++) { // all the plots in the lines
+                        drawLine(whiteboardObjects[i][j].xStart, whiteboardObjects[i][j].yStart, whiteboardObjects[i][j].xEnd, whiteboardObjects[i][j].yEnd, whiteboardObjects[i][j].color, 'self', false, false)
+                    }
                 }
             }
         };
 
         const onUndoEvent = () => {
-            lines.pop();
+            whiteboardObjects.pop();
             redrawWhiteboard()
         };
 
@@ -278,6 +302,7 @@ const Board = () => {
                 <button className="button tools" onClick={setType4}><i className="fa fa-pencil"/></button>
                 <button className="button tools" onClick={setType}><i className="fa fa-circle-o"/></button>
                 <button className="button tools" onClick={setType2}><i className="fa fa-font"/></button>
+                <textarea ref={textRef} defaultValue='example text'/>
                 <button className="button tools" onClick={setType3}><i className="fa fa-square-o"/></button>
                 <button className="button tools" onClick={undoDraw}><i className="fa fa-undo"/></button>
                 <button className="button tools" onClick={clearWhiteboard}><i className="fa fa-trash"/></button>
