@@ -130,10 +130,11 @@ const Board = () => {
         const resizeBoard = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // redraw board
+            redrawWhiteboard()
         };
 
-        resizeBoard();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
         window.addEventListener('resize', resizeBoard, false);
 
@@ -250,6 +251,7 @@ const Board = () => {
     // Clear whiteboard button
      function clearWhiteboard() {
          canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+         whiteboardObjects = [];
          socketRef.current.emit('clear', room);
      }
 
