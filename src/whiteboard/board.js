@@ -62,6 +62,7 @@ const Board = () => {
                 yStart: yStart / h,
                 xEnd: xEnd / w,
                 yEnd: yEnd / h,
+                type: "line",
                 color,
                 room,
             });
@@ -75,6 +76,19 @@ const Board = () => {
             if (addToHolding) {
                 holdingObject[user] = {type: "text", xStart: xStart, yStart: yStart, text: text, color: color} // add to canvas storage
             }
+
+            if (!emit) { return; }
+            const w = canvas.width;
+            const h = canvas.height;
+
+            socketRef.current.emit('drawing', {
+                xStart: xStart / w,
+                yStart: yStart / h,
+                type: "text",
+                text,
+                color,
+                room,
+            });
         };
 
         const drawSquare = (xStart, yStart, xEnd, yEnd, color, user, addToHolding, emit) => {
@@ -91,6 +105,20 @@ const Board = () => {
             if (addToHolding) {
                 holdingObject[user] = {type: "square", xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color} // add to canvas storage
             }
+
+            if (!emit) { return; }
+            const w = canvas.width;
+            const h = canvas.height;
+
+            socketRef.current.emit('drawing', {
+                xStart: xStart / w,
+                yStart: yStart / h,
+                xEnd: xEnd / w,
+                yEnd: yEnd / h,
+                type: "square",
+                color,
+                room,
+            });
         };
 
         const drawCircle = (xStart, yStart, xEnd, yEnd, color, user, addToHolding, emit) => {
@@ -124,6 +152,20 @@ const Board = () => {
             if (addToHolding) {
                 holdingObject[user] = {type: "circle", xStart: xStart, yStart: yStart, xEnd: xEnd, yEnd: yEnd, color: color, radius: radius} // add to canvas storage
             }
+
+            if (!emit) { return; }
+            const w = canvas.width;
+            const h = canvas.height;
+
+            socketRef.current.emit('drawing', {
+                xStart: xStart / w,
+                yStart: yStart / h,
+                xEnd: xEnd / w,
+                yEnd: yEnd / h,
+                type: "circle",
+                color,
+                room,
+            });
         };
 
         // Sets the size of the whiteboard canvas
@@ -144,11 +186,14 @@ const Board = () => {
             current.x = e.clientX;
             current.y = e.clientY;
             if (drawingType === "circle") {
-                drawCircle(current.x, current.y, current.x, current.y, color, 'self', true, false)
+                drawCircle(current.x, current.y, current.x, current.y, color, 'self', true, true)
             } else if (drawingType === "text") {
-                drawText(current.x, current.y, color, textRef.current.value, 'self', true, false)
+                drawText(current.x, current.y, color, textRef.current.value, 'self', true, true);
+                socketRef.current.emit('objectCompleted', {room: room, type: drawingType});
+                whiteboardObjects.push(holdingObject['self']);
+                holdingObject['self'] = [];
             } else if (drawingType === "square") {
-                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', true, false)
+                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', true, true)
             }
         }, false);
 
@@ -160,11 +205,9 @@ const Board = () => {
                 current.x = e.clientX;
                 current.y = e.clientY;
             } else if (drawingType === "circle") {
-                drawCircle(current.x, current.y, e.clientX, e.clientY, color, 'self', true, false)
-            } else if (drawingType === "text") {
-
+                drawCircle(current.x, current.y, e.clientX, e.clientY, color, 'self', true, true)
             } else if (drawingType === "square") {
-                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', true, false)
+                drawSquare(current.x, current.y, e.clientX, e.clientY, color, 'self', true, true)
             }
         };
 
@@ -175,24 +218,25 @@ const Board = () => {
             if (!isDrawing) { return; }
             isDrawing = false;
             if (drawingType === "line") {
-                // move holding line with all the sub lines to main line, allowing for an undo
                 drawLine(current.x, current.y, e.clientX, e.clientY, color, 'self', true,true);
                 whiteboardObjects.push(holdingObject['self']);
                 holdingObject['self'] = [];
-                socketRef.current.emit('lineCompleted', room);
             } else if (drawingType === "circle") {
-                whiteboardObjects.push(holdingObject['self']);
-                holdingObject['self'] = [];
-            } else if (drawingType === "text") {
                 whiteboardObjects.push(holdingObject['self']);
                 holdingObject['self'] = [];
             } else if (drawingType === "square") {
                 whiteboardObjects.push(holdingObject['self']);
                 holdingObject['self'] = [];
             }
+            if (drawingType !== "text") {
+                socketRef.current.emit('objectCompleted', {room: room, type: drawingType});
+            }
         };
 
         const onMouseUpExt = (data) => {
+            const w = canvas.width;
+            const h = canvas.height;
+
             whiteboardObjects.push(holdingObject[data.user]);
             holdingObject[data.user] = []
         };
@@ -206,9 +250,18 @@ const Board = () => {
             if (holdingObject[data.user] == null) {
                 holdingObject[data.user] = []
             }
+
             const w = canvas.width;
             const h = canvas.height;
-            drawLine(data.xStart * w, data.yStart * h, data.xEnd * w, data.yEnd * h, data.color, data.user, true,false);
+            if (data.type === "line") {
+                drawLine(data.xStart * w, data.yStart * h, data.xEnd * w, data.yEnd * h, data.color, data.user, true,false);
+            } else if (data.type === "circle") {
+                drawCircle(data.xStart * w, data.yStart * h, data.xEnd * w, data.yEnd * h, data.color, data.user, true, false)
+            } else if (data.type === "square") {
+                drawSquare(data.xStart * w, data.yStart * h, data.xEnd * w, data.yEnd * h, data.color, data.user, true, false)
+            } else if (data.type === "text") {
+                drawText(data.xStart * w, data.yStart * h, data.color, data.text, data.user, true, false)
+            }
         };
 
         // Clears the whiteboard
@@ -230,6 +283,8 @@ const Board = () => {
                     for (let j = 0; j < whiteboardObjects[i].length; j++) { // all the plots in the lines
                         drawLine(whiteboardObjects[i][j].xStart, whiteboardObjects[i][j].yStart, whiteboardObjects[i][j].xEnd, whiteboardObjects[i][j].yEnd, whiteboardObjects[i][j].color, 'self', false, false)
                     }
+                } else {
+                    console.log("DEBUG: INVALID OBJECT TYPE")
                 }
             }
         };
@@ -244,7 +299,7 @@ const Board = () => {
         socketRef.current.on('drawing', onDrawingEvent);
         socketRef.current.on('clear', onClearEvent);
         socketRef.current.on('undo', onUndoEvent);
-        socketRef.current.on('lineCompleted', onMouseUpExt);
+        socketRef.current.on('objectCompleted', onMouseUpExt);
         socketRef.current.emit('joinRoom', room);
     });
 
