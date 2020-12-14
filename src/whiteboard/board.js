@@ -7,7 +7,7 @@ const Board = () => {
     const socketRef = useRef();
     const textRef = useRef(null);
     const roomRef = useRef(null);
-    let room = "room1";
+    let room = "example";
     let color = 'black';
     let drawingType = "line";
     let lineSize = 5;

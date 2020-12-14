@@ -1,0 +1,9 @@
+cd C:\Users\Josh\Documents\_University\whiteboard
+npm run start
+node server/index.js
+
+
+
+
+COVID IMPORTANCE
+technical docs

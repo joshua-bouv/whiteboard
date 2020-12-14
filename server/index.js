@@ -50,7 +50,7 @@ async function main(){
             return result;
         }
 
-        async function sendWhiteboardToClient(board, socket, room) {
+        async function sendWhiteboardToClient(board, socket) {
             try {
                 whiteboards.collection(board).find({}).forEach(function(doc) {
                     if (doc.type === "line") {
@@ -97,18 +97,18 @@ async function main(){
             // To clear whiteboard across all clients
             socket.on('clear', (room) => {
                 socket.to(room).broadcast.emit('clear');
-                clearBoard("example")
+                clearBoard(room)
             });
 
             // To undo a change on the whiteboard
             socket.on('undo', (room) => {
                 io.in(room).emit('undo');
-                undoBoard("example")
+                undoBoard(room)
             });
 
             // To signify a line has been completed by a client and to add to the database
             socket.on('objectCompleted', (data) => {
-                addObjectToBoard("example", socket.id, holdingLine[socket.id], data.type);
+                addObjectToBoard(data.room, socket.id, holdingLine[socket.id], data.type);
                 holdingLine[socket.id] = [];
                 socket.to(data.room).broadcast.emit('objectCompleted', {user:socket.id})
             });
@@ -122,12 +122,13 @@ async function main(){
             // To change whiteboard
             socket.on('joinRoom', (room) => {
                 addPlayerToRoom(room);
-                sendWhiteboardToClient("example", socket, room);
+                sendWhiteboardToClient(room, socket);
             });
 
             // To create whiteboard
             socket.on('createRoom', () => {
                 let newWhiteboard = makeid(9);
+                // check to make sure it doesn't already exist
                 whiteboards.createCollection(newWhiteboard);
                 addPlayerToRoom(newWhiteboard);
                 // give user permission to access whiteboard if required
