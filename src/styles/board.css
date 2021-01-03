@@ -9,8 +9,15 @@
 }
 
 .colors {
-    position: fixed;
-    display: inline;
+    position: absolute;
+    top: 30px;
+    left: 5px;
+}
+
+.select {
+    position: absolute;
+    top: 5px;
+    left: 5px;
 }
 
 .buttons {
