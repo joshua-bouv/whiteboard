@@ -20,19 +20,20 @@ const App = () => {
     };
 
     for (const key in strokes) { // to generate the pre-defined colors
-        const value = strokes[key];
         strokeButtons.push(<div
             key={key}
             value={stroke}
             onClick={() => {
-                setStroke(value);
+                setStroke(strokes[key]);
             }}
             className={"color "+key} />)
     }
 
     const handleMouseDown = (e) => {
         isDrawing.current = true;
+
         const pos = e.target.getStage().getPointerPosition();
+
         if (tool === "line" || tool === "eraser") {
             setObject([...objects, { tool, points: [pos.x, pos.y], stroke }]);
         } else if (tool === "square") { // potentially other objects
@@ -43,9 +44,7 @@ const App = () => {
     };
 
     const handleMouseMove = (e) => {
-        if (!isDrawing.current) {
-            return;
-        }
+        if (!isDrawing.current) { return; }
 
         const point = e.target.getStage().getPointerPosition();
         let lastObject = objects[objects.length - 1]; // gets the latest object added to whiteboard
@@ -64,6 +63,7 @@ const App = () => {
             let radius;
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
+
             if (x >= y) {
                 if (x >= 0) {
                     radius = x;
@@ -77,6 +77,7 @@ const App = () => {
                     radius = -y;
                 }
             }
+
             lastObject.radius = radius; // update radius of object
             objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
             setObject(objects.concat()); // adds the new updated object
