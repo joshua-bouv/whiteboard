@@ -20,13 +20,15 @@ const App = () => {
     };
 
     for (const key in strokes) { // to generate the pre-defined colors
-        strokeButtons.push(<div
-            key={key}
-            value={stroke}
-            onClick={() => {
-                setStroke(strokes[key]);
-            }}
-            className={"color "+key} />)
+        strokeButtons.push(
+            <div
+                key={key}
+                value={stroke}
+                onClick={() => {
+                    setStroke(strokes[key]);
+                }}
+                className={"color "+key}
+            />)
     }
 
     const handleMouseDown = (e) => {
@@ -107,11 +109,11 @@ const App = () => {
                                     stroke={object.stroke}
                                     strokeWidth={5}
                                     tension={0.5}
-                                    draggable={false}
                                     lineCap="round"
                                     globalCompositeOperation={
                                         object.tool === 'eraser' ? 'destination-out' : 'source-over'
                                     }
+                                    draggable={false}
                                 />
                             )
                         } else if (object.tool === "square") {
@@ -122,8 +124,8 @@ const App = () => {
                                     y={object.points[1]}
                                     width={object.size[0]}
                                     height={object.size[1]}
-                                    draggable={false}
                                     fill={object.stroke}
+                                    draggable={false}
                                 />
                             )
                         } else if (object.tool === "circle") {
@@ -134,6 +136,7 @@ const App = () => {
                                     y={object.points[1]}
                                     radius={object.radius}
                                     fill={object.stroke}
+                                    draggable={false}
                                 />
                             )
                         }
