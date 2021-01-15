@@ -2,12 +2,15 @@ import React, { useState, useRef } from 'react';
 import { render } from 'react-dom';
 import { Stage, Layer, Line, Rect, Circle } from 'react-konva';
 import './styles/board.css';
+import io from "socket.io-client";
 
 const App = () => {
     const [tool, setTool] = useState('line');
     const [stroke, setStroke] = useState('#000000');
     const [objects, setObject] = useState([]);
+    const [socketObjects, setSocketObject] = useState([]);
     const isDrawing = useRef(false);
+    const socketRef = useRef();
     const strokeButtons = [];
     const strokes = {
         'black': '#000000',
@@ -45,10 +48,7 @@ const App = () => {
         }
     };
 
-    const handleMouseMove = (e) => {
-        if (!isDrawing.current) { return; }
-
-        const point = e.target.getStage().getPointerPosition();
+    const drawObject = (point, socket, data) => {
         let lastObject = objects[objects.length - 1]; // gets the latest object added to whiteboard
 
         if (tool === "line" || tool === "eraser") {
@@ -67,28 +67,86 @@ const App = () => {
             let y = point.y - lastObject.points[1];
 
             if (x >= y) {
-                if (x >= 0) {
-                    radius = x;
-                } else {
-                    radius = -x;
-                }
+                radius = x;
             } else {
-                if (y >= 0) {
-                    radius = y;
-                } else {
-                    radius = -y;
-                }
+                radius = y;
             }
 
-            lastObject.radius = radius; // update radius of object
+            if (radius >= 0) { // update radius of object
+                lastObject.radius = radius;
+            } else {
+                lastObject.radius = -radius;
+            }
+
             objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
             setObject(objects.concat()); // adds the new updated object
         }
     };
 
+    const handleMouseMove = (e) => {
+        if (!isDrawing.current) { return; }
+
+        const point = e.target.getStage().getPointerPosition();
+        drawObject(point);
+
+        socketRef.current.emit('drawing', {
+            point,
+        });
+    };
+
+    const handleSocketMove = (data) => {
+        drawObject(data.point, true, data);
+    };
+
     const handleMouseUp = () => {
         isDrawing.current = false;
+        console.log(objects)
     };
+
+    socketRef.current = io.connect(':8080/');
+    socketRef.current.on('drawing', handleSocketMove);
+
+    const canvasDrawObject = (object, i) => {
+        if (object.tool === "line" || object.tool === "eraser") {
+            return (
+                <Line
+                    key={i}
+                    points={object.points}
+                    stroke={object.stroke}
+                    strokeWidth={5}
+                    tension={0.5}
+                    lineCap="round"
+                    globalCompositeOperation={
+                        object.tool === 'eraser' ? 'destination-out' : 'source-over'
+                    }
+                    draggable={false}
+                />
+            )
+        } else if (object.tool === "square") {
+            return (
+                <Rect
+                    key={i}
+                    x={object.points[0]}
+                    y={object.points[1]}
+                    width={object.size[0]}
+                    height={object.size[1]}
+                    fill={object.stroke}
+                    draggable={false}
+                />
+            )
+        } else if (object.tool === "circle") {
+            return (
+                <Circle
+                    key={i}
+                    x={object.points[0]}
+                    y={object.points[1]}
+                    radius={object.radius}
+                    fill={object.stroke}
+                    draggable={false}
+                />
+            )
+        }
+    }
 
     return (
         <div>
@@ -100,47 +158,16 @@ const App = () => {
                 onMouseup={handleMouseUp}
             >
                 <Layer>
-                    {objects.map((object, i) => {
-                        if (object.tool === "line" || object.tool === "eraser") {
-                            return (
-                                <Line
-                                    key={i}
-                                    points={object.points}
-                                    stroke={object.stroke}
-                                    strokeWidth={5}
-                                    tension={0.5}
-                                    lineCap="round"
-                                    globalCompositeOperation={
-                                        object.tool === 'eraser' ? 'destination-out' : 'source-over'
-                                    }
-                                    draggable={false}
-                                />
-                            )
-                        } else if (object.tool === "square") {
-                            return (
-                                <Rect
-                                    key={i}
-                                    x={object.points[0]}
-                                    y={object.points[1]}
-                                    width={object.size[0]}
-                                    height={object.size[1]}
-                                    fill={object.stroke}
-                                    draggable={false}
-                                />
-                            )
-                        } else if (object.tool === "circle") {
-                            return (
-                                <Circle
-                                    key={i}
-                                    x={object.points[0]}
-                                    y={object.points[1]}
-                                    radius={object.radius}
-                                    fill={object.stroke}
-                                    draggable={false}
-                                />
-                            )
-                        }
-                    })}
+                    {
+                        objects.map((object, i) => {canvasDrawObject(object, i)})
+                    }
+                    {
+/*                        socketObjects.map((object, i) => {
+                            // go through each table for each socket
+                            canvasDrawObject(object, i)
+                        })
+*/
+                    }
                 </Layer>
             </Stage>
             <select
