@@ -46,6 +46,12 @@ const App = () => {
         } else if (tool === "circle") {
             setObject([...objects, { tool, points: [pos.x, pos.y], radius: 0, stroke }]);
         }
+
+        socketRef.current.emit('objectStart', {
+            point: pos,
+            tool,
+            stroke
+        });
     };
 
     const drawObject = (point, socket, data) => {
@@ -89,63 +95,48 @@ const App = () => {
         const point = e.target.getStage().getPointerPosition();
         drawObject(point);
 
+        /*
         socketRef.current.emit('drawing', {
             point,
         });
+        */
     };
 
     const handleSocketMove = (data) => {
         drawObject(data.point, true, data);
     };
 
+    const handleSocketDown = (data) => {
+        console.log("ermmmmm")
+        if (socketObjects[data.user] == null) { // untested
+            socketObjects[data.user] = socketObjects;
+            setSocketObject[data.user] = setSocketObject;
+        }
+
+        const pos = data.point;
+
+        if (data.tool === "line" || data.tool === "eraser") {
+            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], stroke }]);
+        } else if (tool === "square") { // potentially other objects
+            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], size: [0, 0], stroke }]);
+        } else if (tool === "circle") {
+            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], radius: 0, stroke }]);
+        }
+    };
+
     const handleMouseUp = () => {
         isDrawing.current = false;
-        console.log(objects)
     };
 
     socketRef.current = io.connect(':8080/');
-    socketRef.current.on('drawing', handleSocketMove);
+    socketRef.current.on('objectStart', handleSocketDown);
+//    socketRef.current.on('drawing', handleSocketMove);
+    socketRef.current.emit('joinRoom', "123");
+
+    //const [socketObjects, setSocketObject] = useState([]);
 
     const canvasDrawObject = (object, i) => {
-        if (object.tool === "line" || object.tool === "eraser") {
-            return (
-                <Line
-                    key={i}
-                    points={object.points}
-                    stroke={object.stroke}
-                    strokeWidth={5}
-                    tension={0.5}
-                    lineCap="round"
-                    globalCompositeOperation={
-                        object.tool === 'eraser' ? 'destination-out' : 'source-over'
-                    }
-                    draggable={false}
-                />
-            )
-        } else if (object.tool === "square") {
-            return (
-                <Rect
-                    key={i}
-                    x={object.points[0]}
-                    y={object.points[1]}
-                    width={object.size[0]}
-                    height={object.size[1]}
-                    fill={object.stroke}
-                    draggable={false}
-                />
-            )
-        } else if (object.tool === "circle") {
-            return (
-                <Circle
-                    key={i}
-                    x={object.points[0]}
-                    y={object.points[1]}
-                    radius={object.radius}
-                    fill={object.stroke}
-                    draggable={false}
-                />
-            )
-        }
+
     }
 
     return (
@@ -159,10 +150,50 @@ const App = () => {
             >
                 <Layer>
                     {
-                        objects.map((object, i) => {canvasDrawObject(object, i)})
+                        objects.map((object, i) => {
+                            if (object.tool === "line" || object.tool === "eraser") {
+                                return (
+                                    <Line
+                                        key={i}
+                                        points={object.points}
+                                        stroke={object.stroke}
+                                        strokeWidth={5}
+                                        tension={0.5}
+                                        lineCap="round"
+                                        globalCompositeOperation={
+                                            object.tool === 'eraser' ? 'destination-out' : 'source-over'
+                                        }
+                                        draggable={false}
+                                    />
+                                )
+                            } else if (object.tool === "square") {
+                                return (
+                                    <Rect
+                                        key={i}
+                                        x={object.points[0]}
+                                        y={object.points[1]}
+                                        width={object.size[0]}
+                                        height={object.size[1]}
+                                        fill={object.stroke}
+                                        draggable={false}
+                                    />
+                                )
+                            } else if (object.tool === "circle") {
+                                return (
+                                    <Circle
+                                        key={i}
+                                        x={object.points[0]}
+                                        y={object.points[1]}
+                                        radius={object.radius}
+                                        fill={object.stroke}
+                                        draggable={false}
+                                    />
+                                )
+                            }
+                        })
                     }
                     {
-/*                        socketObjects.map((object, i) => {
+/*                        socketObjectsHolding.map((object, i) => {
                             // go through each table for each socket
                             canvasDrawObject(object, i)
                         })

@@ -83,6 +83,13 @@ async function main(){
         }
 
         io.on('connection', socket => {
+            // To start the drawing of a new object
+            socket.on('objectStart', (data) => {
+                console.log("recieved object start")
+                data['user'] = socket.id;
+                socket.to("123").emit('objectStart', data);
+            });
+
             // To draw whiteboard across all clients
             socket.on('drawing', (data) => {
                 if (data.type === "line") {
@@ -116,13 +123,13 @@ async function main(){
             function addPlayerToRoom(room) {
                 socket.leaveAll();
                 socket.join(room);
-                holdingLine[socket.id] = [];
+                //holdingLine[socket.id] = [];
             }
 
             // To change whiteboard
             socket.on('joinRoom', (room) => {
                 addPlayerToRoom(room);
-                sendWhiteboardToClient(room, socket);
+                //sendWhiteboardToClient(room, socket);
             });
 
             // To create whiteboard
