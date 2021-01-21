@@ -13,6 +13,9 @@ const Board = () => {
     const [stroke, setStroke] = useState('#000000');
     const [objects, setObject] = useState([]);
     const [socketObjects, setSocketObject] = useState([]);
+
+    const outer = React.useRef(null);
+
     const isDrawing = useRef(false);
     const strokeButtons = [];
     const strokes = {
@@ -26,27 +29,11 @@ const Board = () => {
     };
 
     useEffect(() => {
-        const handleSocketDown = (data) => {
-            console.log("ermmmmm")
-            if (socketObjects[data.user] == null) { // untested
-                socketObjects[data.user] = socketObjects;
-                setSocketObject[data.user] = setSocketObject;
-            }
-
-            const pos = data.point;
-
-            if (data.tool === "line" || data.tool === "eraser") {
-                setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], stroke }]);
-            } else if (tool === "square") { // potentially other objects
-                setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], size: [0, 0], stroke }]);
-            } else if (tool === "circle") {
-                setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], radius: 0, stroke }]);
-            }
-        };
-
         current.on('objectStart', handleSocketDown);
-
-        console.log("gay")
+        return () => {
+            current.off();
+        }
+        console.log("ew")
     })
 
     for (const key in strokes) { // to generate the pre-defined colors
@@ -133,6 +120,24 @@ const Board = () => {
         isDrawing.current = false;
     };
 
+    const handleSocketDown = (data) => {
+        console.log("ermmmmm")
+        if (socketObjects[data.user] == null) { // untested
+            socketObjects[data.user] = socketObjects;
+            setSocketObject[data.user] = setSocketObject;
+        }
+
+        const pos = data.point;
+
+        if (data.tool === "line" || data.tool === "eraser") {
+            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], stroke }]);
+        } else if (tool === "square") { // potentially other objects
+            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], size: [0, 0], stroke }]);
+        } else if (tool === "circle") {
+            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], radius: 0, stroke }]);
+        }
+    };
+
     const handleSocketMove = (data) => {
         drawObject(data.point, true, data);
     };
@@ -147,6 +152,7 @@ const Board = () => {
                 onMouseup={handleMouseUp}
             >
                 <Layer
+                    ref={outer}
                     listening={false}
                 >
                     {
