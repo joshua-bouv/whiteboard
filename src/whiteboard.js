@@ -1,18 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { render } from 'react-dom';
 import { Stage, Layer, Line, Rect, Circle } from 'react-konva';
 import './styles/board.css';
 import io from "socket.io-client";
 
 let current = io.connect(':8080/');
 current.emit('joinRoom', "123");
-//current.on('objectStart', handleSocketDown);
 
 const Board = () => {
     const [tool, setTool] = useState('line');
     const [stroke, setStroke] = useState('#000000');
     const [objects, setObject] = useState([]);
     const [socketObjects, setSocketObject] = useState([]);
+    const [holdingObjects, setholdingObject] = useState([]);
 
     const outer = React.useRef(null);
 
@@ -30,11 +29,13 @@ const Board = () => {
 
     useEffect(() => {
         current.on('objectStart', handleSocketDown);
+        current.on('drawing', handleSocketMove);
+        current.on('objectEnd', handleSocketUp);
+
         return () => {
             current.off();
         }
-        console.log("ew")
-    })
+    });
 
     for (const key in strokes) { // to generate the pre-defined colors
         strokeButtons.push(
@@ -68,8 +69,13 @@ const Board = () => {
         });
     };
 
-    const drawObject = (point, socket, data) => {
-        let lastObject = objects[objects.length - 1]; // gets the latest object added to whiteboard
+    const drawObject = (point, socket, user) => {
+        let lastObject;
+        if (socket) {
+            lastObject = holdingObjects[user]; // gets the latest object added to whiteboard
+        } else {
+            lastObject = objects[objects.length - 1]; // gets the latest object added to whiteboard
+        }
 
         if (tool === "line" || tool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
@@ -109,37 +115,40 @@ const Board = () => {
         const point = e.target.getStage().getPointerPosition();
         drawObject(point);
 
-        /*
-        socketRef.current.emit('drawing', {
+        current.emit('drawing', {
             point,
         });
-        */
     };
 
     const handleMouseUp = () => {
         isDrawing.current = false;
+
+        current.emit('objectEnd', {});
     };
 
     const handleSocketDown = (data) => {
-        console.log("ermmmmm")
-        if (socketObjects[data.user] == null) { // untested
-            socketObjects[data.user] = socketObjects;
-            setSocketObject[data.user] = setSocketObject;
+        if (holdingObjects[data.user] == null) { // untested
+            holdingObjects[data.user] = [];
         }
 
         const pos = data.point;
 
         if (data.tool === "line" || data.tool === "eraser") {
-            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], stroke }]);
+            holdingObjects[data.user] = { tool, points: [pos.x, pos.y], stroke };
         } else if (tool === "square") { // potentially other objects
-            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], size: [0, 0], stroke }]);
+            holdingObjects[data.user] = { tool, points: [pos.x, pos.y], size: [0, 0], stroke };
         } else if (tool === "circle") {
-            setSocketObject[data.user]([...socketObjects[data.user], { tool, points: [pos.x, pos.y], radius: 0, stroke }]);
+            holdingObjects[data.user] = { tool, points: [pos.x, pos.y], radius: 0, stroke };
         }
+        console.log(holdingObjects[data.user])
     };
 
     const handleSocketMove = (data) => {
-        drawObject(data.point, true, data);
+        drawObject(data.point, true, data.user);
+    };
+
+    const handleSocketUp = (data) => {
+        socketObjects.push(holdingObjects[data.user])
     };
 
     return (
@@ -157,6 +166,52 @@ const Board = () => {
                 >
                     {
                         objects.map((object, i) => {
+                            if (object.tool === "line" || object.tool === "eraser") {
+                                return (
+                                    <Line
+                                        key={i}
+                                        points={object.points}
+                                        stroke={object.stroke}
+                                        strokeWidth={5}
+                                        tension={0.5}
+                                        lineCap="round"
+                                        globalCompositeOperation={
+                                            object.tool === 'eraser' ? 'destination-out' : 'source-over'
+                                        }
+                                        draggable={false}
+                                        listening={false}
+                                    />
+                                )
+                            } else if (object.tool === "square") {
+                                return (
+                                    <Rect
+                                        key={i}
+                                        x={object.points[0]}
+                                        y={object.points[1]}
+                                        width={object.size[0]}
+                                        height={object.size[1]}
+                                        fill={object.stroke}
+                                        draggable={false}
+                                        listening={false}
+                                    />
+                                )
+                            } else if (object.tool === "circle") {
+                                return (
+                                    <Circle
+                                        key={i}
+                                        x={object.points[0]}
+                                        y={object.points[1]}
+                                        radius={object.radius}
+                                        fill={object.stroke}
+                                        draggable={false}
+                                        listening={false}
+                                    />
+                                )
+                            }
+                        })
+                    }
+                    {
+                        socketObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
                                 return (
                                     <Line

@@ -23,9 +23,19 @@ async function main(){
 
             // To start the drawing of a new object
             socket.on('objectStart', (data) => {
-                console.log("start recieved")
                 data['user'] = socket.id;
                 socket.to("123").emit('objectStart', data);
+            });
+
+            // To draw whiteboard across all clients
+            socket.on('drawing', (data) => {
+                data['user'] = socket.id;
+                socket.to("123").broadcast.emit('drawing', data);
+            });
+
+            socket.on('objectEnd', (data) => {
+                data['user'] = socket.id;
+                socket.to("123").broadcast.emit('objectEnd', data);
             });
         });
 
