@@ -154,11 +154,12 @@ const Board = () => {
 
     const handleSocketUp = (data) => {
         socketObjects.push(holdingObjects[data.user])
+
         console.log(socketObjects)
     };
 
     const handleStreamLine = (data) => {
-        // add to objects
+        setSocketObject([...socketObjects, data]);
     }
 
     const clearWhiteboard = () => {

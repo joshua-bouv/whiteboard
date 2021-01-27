@@ -28,7 +28,7 @@ async function main(){
         async function sendWhiteboardToClient(board, socket) {
             try {
                 whiteboards.collection(board).find({}).forEach(function(doc) {
-                    socket.emit('streamLine', {doc})
+                    socket.emit('streamLine', doc)
                 }, function(err) {
                     console.log(err)
                 });
