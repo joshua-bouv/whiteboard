@@ -12,13 +12,67 @@ async function main(){
 
     try {
         await client.connect();
+        const whiteboards = client.db("whiteboards");
+
+        // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+        function makeID(length) {
+            let result = '';
+            let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let charactersLength = characters.length;
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * charactersLength));
+            }
+            return result;
+        }
+
+        async function sendWhiteboardToClient(board, socket) {
+            try {
+                whiteboards.collection(board).find({}).forEach(function(doc) {
+                    socket.emit('streamLine', {doc})
+                }, function(err) {
+                    console.log(err)
+                });
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        async function addObjectToBoard(board, data) {
+            try {
+                await whiteboards.collection(board).insertOne(data);
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        async function clearBoard(board) {
+            try {
+                await whiteboards.collection(board).deleteMany({});
+            } catch (e) {
+                console.error(e)
+            }
+        }
 
         io.on('connection', socket => {
-            // To join a whiteboard
-            socket.on('joinRoom', (room) => {
+            function addPlayer(room) {
                 socket.leaveAll();
                 socket.join(room);
                 console.log("User connected to room "+room)
+            }
+
+            // To join a whiteboard
+            socket.on('joinRoom', (room) => {
+                addPlayer(room)
+                sendWhiteboardToClient(room, socket)
+            });
+
+            // To create whiteboard
+            socket.on('createRoom', () => {
+                let newWhiteboard = makeID(9);
+                // check to make sure ID doesn't already exist
+                whiteboards.createCollection(newWhiteboard);
+                addPlayer(newWhiteboard)
+                // give user permission to access whiteboard if required
             });
 
             // To start the drawing of a new object
@@ -34,8 +88,15 @@ async function main(){
             });
 
             socket.on('objectEnd', (data) => {
-                data['user'] = socket.id;
-                socket.to("123").broadcast.emit('objectEnd', data);
+                data.object['user'] = socket.id;
+                addObjectToBoard(data.room, data.object)
+                socket.to(data.room).broadcast.emit('objectEnd', data.room);
+            });
+
+            // To clear whiteboard across all clients
+            socket.on('clearWhiteboard', (room) => {
+                socket.to(room).broadcast.emit('clearWhiteboard');
+                clearBoard(room)
             });
         });
 

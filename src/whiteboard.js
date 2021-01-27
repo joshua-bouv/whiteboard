@@ -1,5 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { setState, useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Rect, Circle } from 'react-konva';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faTrash } from '@fortawesome/free-solid-svg-icons'
 import './styles/board.css';
 import io from "socket.io-client";
 
@@ -9,13 +11,13 @@ current.emit('joinRoom', "123");
 const Board = () => {
     const [tool, setTool] = useState('line');
     const [stroke, setStroke] = useState('#000000');
-    const [objects, setObject] = useState([]);
-    const [socketObjects, setSocketObject] = useState([]);
-    const [holdingObjects, setholdingObject] = useState([]);
-
-    const outer = React.useRef(null);
-
+    let [objects, setObject] = useState([]);
+    let [socketObjects, setSocketObject] = useState([]);
+    const [holdingObjects] = useState([]);
+    let [room, joinRoom] = useState("123");
+    const outer = useRef(null);
     const isDrawing = useRef(false);
+    const roomIDRef = useRef(null);
     const strokeButtons = [];
     const strokes = {
         'black': '#000000',
@@ -31,6 +33,9 @@ const Board = () => {
         current.on('objectStart', handleSocketDown);
         current.on('drawing', handleSocketMove);
         current.on('objectEnd', handleSocketUp);
+
+        current.on('streamLine', handleStreamLine);
+        current.on('clearWhiteboard', handleSocketClear);
 
         return () => {
             current.off();
@@ -122,8 +127,9 @@ const Board = () => {
 
     const handleMouseUp = () => {
         isDrawing.current = false;
+        let completedObject = objects[objects.length - 1];
 
-        current.emit('objectEnd', {});
+        current.emit('objectEnd', {room, object: completedObject});
     };
 
     const handleSocketDown = (data) => {
@@ -140,7 +146,6 @@ const Board = () => {
         } else if (tool === "circle") {
             holdingObjects[data.user] = { tool, points: [pos.x, pos.y], radius: 0, stroke };
         }
-        console.log(holdingObjects[data.user])
     };
 
     const handleSocketMove = (data) => {
@@ -149,7 +154,35 @@ const Board = () => {
 
     const handleSocketUp = (data) => {
         socketObjects.push(holdingObjects[data.user])
+        console.log(socketObjects)
     };
+
+    const handleStreamLine = (data) => {
+        // add to objects
+    }
+
+    const clearWhiteboard = () => {
+        objects = []
+        socketObjects = []
+        setObject([])
+        setSocketObject([])
+        outer.current.getStage().clear();
+    }
+
+    const handleSocketClear = () => {
+        clearWhiteboard()
+    }
+
+    const handleClear = () => {
+        clearWhiteboard()
+        current.emit('clearWhiteboard', room);
+    }
+
+    const handleJoin = () => {
+        clearWhiteboard()
+        room = roomIDRef.current.value
+        current.emit('joinRoom', room);
+    }
 
     return (
         <div>
@@ -272,6 +305,12 @@ const Board = () => {
             </select>
             <div className="colors">
                 {strokeButtons}
+            </div>
+            <div className="buttons">
+                <textarea defaultValue='example text'/>
+                <button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
+                <textarea ref={roomIDRef} defaultValue={room}/>
+                <button className="button toolsL" onClick={handleJoin}>Join room</button>
             </div>
         </div>
     );

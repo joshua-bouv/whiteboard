@@ -21,9 +21,9 @@
 }
 
 .buttons {
-    position: fixed;
-    display: inline;
-    margin-top: 200px;
+    position: absolute;
+    top: 210px;
+    left: 5px;
 }
 
 .color {
