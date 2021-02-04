@@ -19,6 +19,8 @@ const Board = () => {
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
     const strokeButtons = [];
+    let [history, setHistory] = useState([]);
+
     const strokes = {
         'black': '#000000',
         'red': '#e74c3c',
@@ -33,7 +35,6 @@ const Board = () => {
         current.on('objectStart', handleSocketDown);
         current.on('drawing', handleSocketMove);
         current.on('objectEnd', handleSocketUp);
-
         current.on('streamLine', handleStreamLine);
         current.on('clearWhiteboard', handleSocketClear);
 
@@ -60,6 +61,12 @@ const Board = () => {
             objects.push(holdingObjects[key])
         }
         setObject(objects.concat())
+    }
+
+    const generateHistoryStep = () => {
+        // delete everything on and after this current step - probs slice
+        history.push([...socketObjects])
+        setHistory(history)
     }
 
     const drawObject = (point, user) => {
@@ -159,6 +166,7 @@ const Board = () => {
         current.emit('objectEnd', {room, object: completedObject});
         holdingObjects['self'] = [];
         generateIncompleteObjects()
+        generateHistoryStep()
     };
 
     /* For ending objects via an external user */
@@ -167,6 +175,7 @@ const Board = () => {
         setSocketObject(socketObjects.concat())
         holdingObjects[user] = [];
         generateIncompleteObjects()
+        generateHistoryStep()
     };
 
     /* For streaming objects from the database */
@@ -195,6 +204,16 @@ const Board = () => {
         clearWhiteboard()
         room = roomIDRef.current.value
         current.emit('joinRoom', room);
+    }
+
+    const handleUndo = () => {
+        setSocketObject(history[history.length-2])
+    }
+
+    const handleRedo = () => {
+        // if there is history
+        //stepsMade++
+        //setSocketObject(history[stepsMade])
     }
 
     return (
@@ -324,6 +343,8 @@ const Board = () => {
                 <button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
                 <textarea ref={roomIDRef} defaultValue={room}/>
                 <button className="button toolsL" onClick={handleJoin}>Join room</button>
+                <button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faTrash} /></button>
+                <button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faTrash} /></button>
             </div>
         </div>
     );
