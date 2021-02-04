@@ -54,41 +54,40 @@ const Board = () => {
             />)
     }
 
+    const generateIncompleteObjects = () => {
+        objects = []
+        for (let key in holdingObjects) {
+            objects.push(holdingObjects[key])
+        }
+        setObject(objects.concat())
+    }
+
     const drawObject = (point, user) => {
         let lastObject = holdingObjects[user]; // gets the latest object added to whiteboard
 
         if (tool === "line" || tool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
-            objects.push(holdingObjects[user])
-            setObject(objects.concat())
-
-            //objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
-            //setObject(objects.concat()); // adds the new updated object
+            generateIncompleteObjects()
         } else if (tool === "square") { // potentially other objects
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
             lastObject.size = [x, y]; // update size of object
-            //objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
-            //setObject(objects.concat()); // adds the new updated object
+            generateIncompleteObjects()
         } else if (tool === "circle") {
             let radius;
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
-
             if (x >= y) {
                 radius = x;
             } else {
                 radius = y;
             }
-
             if (radius >= 0) { // update radius of object
                 lastObject.radius = radius;
             } else {
                 lastObject.radius = -radius;
             }
-
-            //objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
-            //setObject(objects.concat()); // adds the new updated object
+            generateIncompleteObjects()
         }
     };
 
@@ -158,12 +157,16 @@ const Board = () => {
         socketObjects.push(completedObject)
         setSocketObject(socketObjects.concat())
         current.emit('objectEnd', {room, object: completedObject});
+        holdingObjects['self'] = [];
+        generateIncompleteObjects()
     };
 
     /* For ending objects via an external user */
     const handleSocketUp = (user) => {
         socketObjects.push(holdingObjects[user])
         setSocketObject(socketObjects.concat())
+        holdingObjects[user] = [];
+        generateIncompleteObjects()
     };
 
     /* For streaming objects from the database */
