@@ -13,7 +13,7 @@ const Board = () => {
     const [stroke, setStroke] = useState('#000000');
     let [objects, setObject] = useState([]);
     let [socketObjects, setSocketObject] = useState([]);
-    const [holdingObjects] = useState([]);
+    const [holdingObjects, setHoldingObjects] = useState([]);
     let [room, joinRoom] = useState("123");
     const outer = useRef(null);
     const isDrawing = useRef(false);
@@ -54,44 +54,22 @@ const Board = () => {
             />)
     }
 
-    const handleMouseDown = (e) => {
-        isDrawing.current = true;
-
-        const pos = e.target.getStage().getPointerPosition();
-
-        if (tool === "line" || tool === "eraser") {
-            setObject([...objects, { tool, points: [pos.x, pos.y], stroke }]);
-        } else if (tool === "square") { // potentially other objects
-            setObject([...objects, { tool, points: [pos.x, pos.y], size: [0, 0], stroke }]);
-        } else if (tool === "circle") {
-            setObject([...objects, { tool, points: [pos.x, pos.y], radius: 0, stroke }]);
-        }
-
-        current.emit('objectStart', {
-            point: pos,
-            tool,
-            stroke
-        });
-    };
-
-    const drawObject = (point, socket, user) => {
-        let lastObject;
-        if (socket) {
-            lastObject = holdingObjects[user]; // gets the latest object added to whiteboard
-        } else {
-            lastObject = objects[objects.length - 1]; // gets the latest object added to whiteboard
-        }
+    const drawObject = (point, user) => {
+        let lastObject = holdingObjects[user]; // gets the latest object added to whiteboard
 
         if (tool === "line" || tool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
-            objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
-            setObject(objects.concat()); // adds the new updated object
+            objects.push(holdingObjects[user])
+            setObject(objects.concat())
+
+            //objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
+            //setObject(objects.concat()); // adds the new updated object
         } else if (tool === "square") { // potentially other objects
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
             lastObject.size = [x, y]; // update size of object
-            objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
-            setObject(objects.concat()); // adds the new updated object
+            //objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
+            //setObject(objects.concat()); // adds the new updated object
         } else if (tool === "circle") {
             let radius;
             let x = point.x - lastObject.points[0];
@@ -109,29 +87,37 @@ const Board = () => {
                 lastObject.radius = -radius;
             }
 
-            objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
-            setObject(objects.concat()); // adds the new updated object
+            //objects.splice(objects.length - 1, 1, lastObject); // deletes the old object
+            //setObject(objects.concat()); // adds the new updated object
         }
     };
 
-    const handleMouseMove = (e) => {
-        if (!isDrawing.current) { return; }
+    /* For starting objects via the local user */
+    const handleMouseDown = (e) => {
+        isDrawing.current = true;
 
-        const point = e.target.getStage().getPointerPosition();
-        drawObject(point);
+        if (holdingObjects['self'] == null) { // untested
+            holdingObjects['self'] = [];
+        }
 
-        current.emit('drawing', {
-            point,
+        const pos = e.target.getStage().getPointerPosition();
+
+        if (tool === "line" || tool === "eraser") {
+            holdingObjects['self'] = { tool, points: [pos.x, pos.y], stroke };
+        } else if (tool === "square") { // potentially other objects
+            holdingObjects['self'] = { tool, points: [pos.x, pos.y], size: [0, 0], stroke };
+        } else if (tool === "circle") {
+            holdingObjects['self'] = { tool, points: [pos.x, pos.y], radius: 0, stroke };
+        }
+
+        current.emit('objectStart', {
+            point: pos,
+            tool,
+            stroke
         });
     };
 
-    const handleMouseUp = () => {
-        isDrawing.current = false;
-        let completedObject = objects[objects.length - 1];
-
-        current.emit('objectEnd', {room, object: completedObject});
-    };
-
+    /* For starting objects via an external user */
     const handleSocketDown = (data) => {
         if (holdingObjects[data.user] == null) { // untested
             holdingObjects[data.user] = [];
@@ -148,16 +134,39 @@ const Board = () => {
         }
     };
 
+    /* For drawing objects via the local user */
+    const handleMouseMove = (e) => {
+        if (!isDrawing.current) { return; }
+
+        const point = e.target.getStage().getPointerPosition();
+        drawObject(point, 'self');
+
+        current.emit('drawing', {
+            point,
+        });
+    };
+
+    /* For drawing objects via an external user */
     const handleSocketMove = (data) => {
-        drawObject(data.point, true, data.user);
+        drawObject(data.point, data.user);
     };
 
-    const handleSocketUp = (data) => {
-        socketObjects.push(holdingObjects[data.user])
-
-        console.log(socketObjects)
+    /* For ending objects via the local user */
+    const handleMouseUp = () => {
+        isDrawing.current = false;
+        let completedObject = holdingObjects['self'];
+        socketObjects.push(completedObject)
+        setSocketObject(socketObjects.concat())
+        current.emit('objectEnd', {room, object: completedObject});
     };
 
+    /* For ending objects via an external user */
+    const handleSocketUp = (user) => {
+        socketObjects.push(holdingObjects[user])
+        setSocketObject(socketObjects.concat())
+    };
+
+    /* For streaming objects from the database */
     const handleStreamLine = (data) => {
         setSocketObject([...socketObjects, data]);
     }

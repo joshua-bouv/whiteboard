@@ -90,7 +90,7 @@ async function main(){
             socket.on('objectEnd', (data) => {
                 data.object['user'] = socket.id;
                 addObjectToBoard(data.room, data.object)
-                socket.to(data.room).broadcast.emit('objectEnd', data.room);
+                socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
             });
 
             // To clear whiteboard across all clients
