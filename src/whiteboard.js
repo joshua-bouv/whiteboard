@@ -19,6 +19,7 @@ const Board = () => {
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
     const strokeButtons = [];
+    let [historyCount, setHistoryCount] = useState(0);
     let [history, setHistory] = useState([]);
 
     const strokes = {
@@ -65,6 +66,7 @@ const Board = () => {
 
     const generateHistoryStep = () => {
         // delete everything on and after this current step - probs slice
+        setHistoryCount(historyCount + 1)
         history.push([...socketObjects])
         setHistory(history)
     }
@@ -181,6 +183,7 @@ const Board = () => {
     /* For streaming objects from the database */
     const handleStreamLine = (data) => {
         setSocketObject([...socketObjects, data]);
+        generateHistoryStep()
     }
 
     const clearWhiteboard = () => {
@@ -207,13 +210,13 @@ const Board = () => {
     }
 
     const handleUndo = () => {
-        setSocketObject(history[history.length-2])
+        setHistoryCount(historyCount - 1)
+        setSocketObject(history[historyCount - 1])
     }
 
     const handleRedo = () => {
-        // if there is history
-        //stepsMade++
-        //setSocketObject(history[stepsMade])
+        setHistoryCount(historyCount + 1)
+        setSocketObject(history[historyCount + 1])
     }
 
     return (
