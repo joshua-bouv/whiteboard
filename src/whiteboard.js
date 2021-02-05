@@ -2,6 +2,8 @@ import React, { setState, useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Rect, Circle } from 'react-konva';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faUndo } from '@fortawesome/free-solid-svg-icons'
+import { faRedo } from '@fortawesome/free-solid-svg-icons'
 import './styles/board.css';
 import io from "socket.io-client";
 
@@ -346,8 +348,8 @@ const Board = () => {
                 <button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
                 <textarea ref={roomIDRef} defaultValue={room}/>
                 <button className="button toolsL" onClick={handleJoin}>Join room</button>
-                <button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faTrash} /></button>
-                <button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faTrash} /></button>
+                <button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faUndo} /></button>
+                <button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faRedo} /></button>
             </div>
         </div>
     );
