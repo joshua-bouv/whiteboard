@@ -35,6 +35,7 @@ const Board = () => {
     };
 
     useEffect(() => {
+        console.log("refresh")
         current.on('objectStart', handleSocketDown);
         current.on('drawing', handleSocketMove);
         current.on('objectEnd', handleSocketUp);
@@ -67,9 +68,10 @@ const Board = () => {
     }
 
     const generateHistoryStep = () => {
+        console.log("gen step")
         // delete everything on and after this current step - probs slice
         setHistoryCount(historyCount + 1)
-        history.push([...socketObjects])
+        history.push([...socketObjects.concat()])
         setHistory(history)
     }
 
@@ -184,7 +186,8 @@ const Board = () => {
 
     /* For streaming objects from the database */
     const handleStreamLine = (data) => {
-        setSocketObject([...socketObjects, data]);
+        socketObjects.push(data)
+        setSocketObject(socketObjects.concat());
         generateHistoryStep()
     }
 
@@ -213,12 +216,14 @@ const Board = () => {
 
     const handleUndo = () => {
         setHistoryCount(historyCount - 1)
-        setSocketObject(history[historyCount - 1])
+        setSocketObject(history[(historyCount-1) - 1])
     }
 
     const handleRedo = () => {
-        setHistoryCount(historyCount + 1)
-        setSocketObject(history[historyCount + 1])
+        if (historyCount <= history.length-1) {
+            setHistoryCount(historyCount + 1)
+            setSocketObject(history[historyCount])
+        }
     }
 
     return (
