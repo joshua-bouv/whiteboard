@@ -98,6 +98,16 @@ async function main(){
                 socket.to(room).broadcast.emit('clearWhiteboard');
                 clearBoard(room)
             });
+
+            // To undo a change on the whiteboard
+            socket.on('undoWhiteboard', (room) => {
+                socket.to(room).broadcast.emit('undoWhiteboard');
+            });
+
+            // To redo a change on the whiteboard
+            socket.on('redoWhiteboard', (room) => {
+                socket.to(room).broadcast.emit('redoWhiteboard');
+            });
         });
 
         http.listen(8080,() => console.log(`Whiteboard server active`));

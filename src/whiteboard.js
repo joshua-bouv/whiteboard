@@ -40,7 +40,9 @@ const Board = () => {
         current.on('drawing', handleSocketMove);
         current.on('objectEnd', handleSocketUp);
         current.on('streamLine', handleStreamLine);
-        current.on('clearWhiteboard', handleSocketClear);
+        current.on('clearWhiteboard', clearWhiteboard);
+        current.on('undoWhiteboard', undoWhiteboard);
+        current.on('redoWhiteboard', redoWhiteboard);
 
         return () => {
             current.off();
@@ -199,8 +201,18 @@ const Board = () => {
         outer.current.getStage().clear();
     }
 
-    const handleSocketClear = () => {
-        clearWhiteboard()
+    const undoWhiteboard = () => {
+        if (historyCount > 1) {
+            setHistoryCount(historyCount - 1)
+            setSocketObject(history[(historyCount - 1) - 1])
+        }
+    }
+
+    const redoWhiteboard = () => {
+        if (historyCount <= history.length - 1) {
+            setHistoryCount(historyCount + 1)
+            setSocketObject(history[historyCount])
+        }
     }
 
     const handleClear = () => {
@@ -208,24 +220,20 @@ const Board = () => {
         current.emit('clearWhiteboard', room);
     }
 
+    const handleUndo = () => {
+        undoWhiteboard()
+        current.emit('undoWhiteboard', room);
+    }
+
+    const handleRedo = () => {
+        redoWhiteboard()
+        current.emit('redoWhiteboard', room);
+    }
+
     const handleJoin = () => {
         clearWhiteboard()
         room = roomIDRef.current.value
         current.emit('joinRoom', room);
-    }
-
-    const handleUndo = () => {
-        if (historyCount > 1) {
-            setHistoryCount(historyCount - 1)
-            setSocketObject(history[(historyCount - 1) - 1])
-        }
-    }
-
-    const handleRedo = () => {
-        if (historyCount <= history.length - 1) {
-            setHistoryCount(historyCount + 1)
-            setSocketObject(history[historyCount])
-        }
     }
 
     return (
