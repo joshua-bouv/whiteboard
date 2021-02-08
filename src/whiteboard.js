@@ -215,12 +215,14 @@ const Board = () => {
     }
 
     const handleUndo = () => {
-        setHistoryCount(historyCount - 1)
-        setSocketObject(history[(historyCount-1) - 1])
+        if (historyCount > 1) {
+            setHistoryCount(historyCount - 1)
+            setSocketObject(history[(historyCount - 1) - 1])
+        }
     }
 
     const handleRedo = () => {
-        if (historyCount <= history.length-1) {
+        if (historyCount <= history.length - 1) {
             setHistoryCount(historyCount + 1)
             setSocketObject(history[historyCount])
         }
