@@ -33,6 +33,7 @@ async function main(){
                     console.log(err)
                 });
             } catch (e) {
+                console.log("Error here")
                 console.error(e)
             }
         }

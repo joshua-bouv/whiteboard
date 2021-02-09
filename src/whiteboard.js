@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
 import { faUndo } from '@fortawesome/free-solid-svg-icons'
 import { faRedo } from '@fortawesome/free-solid-svg-icons'
+import { faArrowsAlt } from '@fortawesome/free-solid-svg-icons'
 import './styles/board.css';
 import io from "socket.io-client";
 
@@ -13,17 +14,18 @@ current.emit('joinRoom', "123");
 const Board = () => {
     const [tool, setTool] = useState('line');
     const [stroke, setStroke] = useState('#000000');
-    let [objects, setObject] = useState([]);
-    let [socketObjects, setSocketObject] = useState([]);
+    const [isDragging, setDragging] = useState(false);
+    let [incompleteObjects, setIncompleteObjects] = useState([]);
+    let [completedObjects, setCompletedObjects] = useState([]);
     const [holdingObjects, setHoldingObjects] = useState([]);
+    let [historicSnapshots, setHistoricSnapshots] = useState([]);
     let [room, joinRoom] = useState("123");
     const outer = useRef(null);
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
-    const strokeButtons = [];
     let [historyCount, setHistoryCount] = useState(0);
-    let [history, setHistory] = useState([]);
 
+    const strokeButtons = [];
     const strokes = {
         'black': '#000000',
         'red': '#e74c3c',
@@ -33,21 +35,6 @@ const Board = () => {
         'grey': '#95a5a6',
         'yellow': '#f1c40f',
     };
-
-    useEffect(() => {
-        console.log("refresh")
-        current.on('objectStart', handleSocketDown);
-        current.on('drawing', handleSocketMove);
-        current.on('objectEnd', handleSocketUp);
-        current.on('streamLine', handleStreamLine);
-        current.on('clearWhiteboard', clearWhiteboard);
-        current.on('undoWhiteboard', undoWhiteboard);
-        current.on('redoWhiteboard', redoWhiteboard);
-
-        return () => {
-            current.off();
-        }
-    });
 
     for (const key in strokes) { // to generate the pre-defined colors
         strokeButtons.push(
@@ -61,20 +48,40 @@ const Board = () => {
             />)
     }
 
-    const generateIncompleteObjects = () => {
-        objects = []
-        for (let key in holdingObjects) {
-            objects.push(holdingObjects[key])
+    useEffect(() => {
+        current.on('objectStart', handleSocketDown);
+        current.on('drawing', handleSocketMove);
+        current.on('objectEnd', handleSocketUp);
+        current.on('streamLine', handleStreamLine);
+        current.on('clearWhiteboard', clearWhiteboard);
+        current.on('undoWhiteboard', undoWhiteboard);
+        current.on('redoWhiteboard', redoWhiteboard);
+
+        return () => {
+            current.off();
         }
-        setObject(objects.concat())
+    });
+
+    const generateIncompleteObjects = () => {
+        incompleteObjects = []
+        for (let key in holdingObjects) {
+            incompleteObjects.push(holdingObjects[key])
+        }
+        setIncompleteObjects(incompleteObjects.concat())
     }
 
     const generateHistoryStep = () => {
-        console.log("gen step")
-        // delete everything on and after this current step - probs slice
+        if (historyCount !== historicSnapshots.length) {
+            console.log("new timeline")
+//      historicSnapshots = historicSnapshots.slice(0, historyCount)
+        }
+        console.log("GEN HIS STEP:")
+        console.log(historicSnapshots)
+        console.log(historyCount)
+
         setHistoryCount(historyCount + 1)
-        history.push([...socketObjects.concat()])
-        setHistory(history)
+        historicSnapshots.push([...completedObjects.concat()])
+        setHistoricSnapshots(historicSnapshots)
     }
 
     const drawObject = (point, user) => {
@@ -169,8 +176,8 @@ const Board = () => {
     const handleMouseUp = () => {
         isDrawing.current = false;
         let completedObject = holdingObjects['self'];
-        socketObjects.push(completedObject)
-        setSocketObject(socketObjects.concat())
+        completedObjects.push(completedObject)
+        setCompletedObjects(completedObjects.concat())
         current.emit('objectEnd', {room, object: completedObject});
         holdingObjects['self'] = [];
         generateIncompleteObjects()
@@ -179,8 +186,8 @@ const Board = () => {
 
     /* For ending objects via an external user */
     const handleSocketUp = (user) => {
-        socketObjects.push(holdingObjects[user])
-        setSocketObject(socketObjects.concat())
+        completedObjects.push(holdingObjects[user])
+        setCompletedObjects(completedObjects.concat())
         holdingObjects[user] = [];
         generateIncompleteObjects()
         generateHistoryStep()
@@ -188,30 +195,38 @@ const Board = () => {
 
     /* For streaming objects from the database */
     const handleStreamLine = (data) => {
-        socketObjects.push(data)
-        setSocketObject(socketObjects.concat());
+        completedObjects.push(data)
+        setCompletedObjects(completedObjects.concat());
         generateHistoryStep()
     }
 
     const clearWhiteboard = () => {
-        objects = []
-        socketObjects = []
-        setObject([])
-        setSocketObject([])
+        incompleteObjects = []
+        completedObjects = []
+        setIncompleteObjects([])
+        setCompletedObjects([])
         outer.current.getStage().clear();
     }
 
     const undoWhiteboard = () => {
+        console.log("UNDO:")
+        console.log(historyCount)
+        console.log(historicSnapshots)
         if (historyCount > 1) {
             setHistoryCount(historyCount - 1)
-            setSocketObject(history[(historyCount - 1) - 1])
+            setCompletedObjects(historicSnapshots[(historyCount - 1) - 1])
         }
     }
 
     const redoWhiteboard = () => {
-        if (historyCount <= history.length - 1) {
+        console.log("REDO:")
+        console.log(historyCount)
+        console.log(historicSnapshots.length - 1)
+        console.log(historicSnapshots)
+        if (historyCount <= historicSnapshots.length - 1) {
             setHistoryCount(historyCount + 1)
-            setSocketObject(history[historyCount])
+            console.log(historyCount)
+            setCompletedObjects(historicSnapshots[historyCount])
         }
     }
 
@@ -236,6 +251,14 @@ const Board = () => {
         current.emit('joinRoom', room);
     }
 
+    const handleMoveObjects = () => {
+        if (isDragging) {
+            setDragging(false)
+        } else {
+            setDragging(true)
+        }
+    }
+
     return (
         <div>
             <Stage
@@ -247,10 +270,10 @@ const Board = () => {
             >
                 <Layer
                     ref={outer}
-                    listening={false}
+                    listening={isDragging}
                 >
                     {
-                        objects.map((object, i) => {
+                        incompleteObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
                                 return (
                                     <Line
@@ -296,7 +319,7 @@ const Board = () => {
                         })
                     }
                     {
-                        socketObjects.map((object, i) => {
+                        completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
                                 return (
                                     <Line
@@ -309,8 +332,8 @@ const Board = () => {
                                         globalCompositeOperation={
                                             object.tool === 'eraser' ? 'destination-out' : 'source-over'
                                         }
-                                        draggable={false}
-                                        listening={false}
+                                        draggable={isDragging}
+                                        listening={isDragging}
                                     />
                                 )
                             } else if (object.tool === "square") {
@@ -322,8 +345,8 @@ const Board = () => {
                                         width={object.size[0]}
                                         height={object.size[1]}
                                         fill={object.stroke}
-                                        draggable={false}
-                                        listening={false}
+                                        draggable={isDragging}
+                                        listening={isDragging}
                                     />
                                 )
                             } else if (object.tool === "circle") {
@@ -334,8 +357,8 @@ const Board = () => {
                                         y={object.points[1]}
                                         radius={object.radius}
                                         fill={object.stroke}
-                                        draggable={false}
-                                        listening={false}
+                                        draggable={isDragging}
+                                        listening={isDragging}
                                     />
                                 )
                             }
@@ -365,6 +388,7 @@ const Board = () => {
                 <button className="button toolsL" onClick={handleJoin}>Join room</button>
                 <button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faUndo} /></button>
                 <button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faRedo} /></button>
+                <button className="button tools" onClick={handleMoveObjects}><FontAwesomeIcon icon={faArrowsAlt} /></button>
             </div>
         </div>
     );
