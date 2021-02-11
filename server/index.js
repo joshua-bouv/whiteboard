@@ -28,7 +28,7 @@ async function main(){
         async function sendWhiteboardToClient(board, socket) {
             try {
                 whiteboards.collection(board).find({}).forEach(function(doc) {
-                    socket.emit('streamLine', doc)
+                    socket.emit('streamObject', doc)
                 }, function(err) {
                     console.log(err)
                 });
@@ -49,6 +49,14 @@ async function main(){
         async function clearBoard(board) {
             try {
                 await whiteboards.collection(board).deleteMany({});
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        async function undoBoard(board) {
+            try {
+                await whiteboards.collection(board).findOneAndDelete({}, {sort: {_id: -1}})
             } catch (e) {
                 console.error(e)
             }
@@ -94,6 +102,13 @@ async function main(){
                 socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
             });
 
+            socket.on('streamObject', (data) => {
+                data.object['user'] = socket.id;
+                console.log(data)
+                //addObjectToBoard(data.room, data)
+                //socket.emit('streamObject', data)
+            });
+
             // To clear whiteboard across all clients
             socket.on('clearWhiteboard', (room) => {
                 socket.to(room).broadcast.emit('clearWhiteboard');
@@ -102,12 +117,15 @@ async function main(){
 
             // To undo a change on the whiteboard
             socket.on('undoWhiteboard', (room) => {
+                undoBoard(room)
                 socket.to(room).broadcast.emit('undoWhiteboard');
             });
 
             // To redo a change on the whiteboard
-            socket.on('redoWhiteboard', (room) => {
-                socket.to(room).broadcast.emit('redoWhiteboard');
+            socket.on('redoWhiteboard', (data) => {
+                data.object['user'] = socket.id;
+                addObjectToBoard(data.room, data.object)
+                socket.to(data.room).broadcast.emit('redoWhiteboard');
             });
         });
 

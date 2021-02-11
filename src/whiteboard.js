@@ -52,7 +52,7 @@ const Board = () => {
         current.on('objectStart', handleSocketDown);
         current.on('drawing', handleSocketMove);
         current.on('objectEnd', handleSocketUp);
-        current.on('streamLine', handleStreamLine);
+        current.on('streamObject', handleStreamObject);
         current.on('clearWhiteboard', clearWhiteboard);
         current.on('undoWhiteboard', undoWhiteboard);
         current.on('redoWhiteboard', redoWhiteboard);
@@ -72,13 +72,8 @@ const Board = () => {
 
     const generateHistoryStep = () => {
         if (historyCount !== historicSnapshots.length) {
-            console.log("new timeline")
-//      historicSnapshots = historicSnapshots.slice(0, historyCount)
+            historicSnapshots = historicSnapshots.slice(0, historyCount)
         }
-        console.log("GEN HIS STEP:")
-        console.log(historicSnapshots)
-        console.log(historyCount)
-
         setHistoryCount(historyCount + 1)
         historicSnapshots.push([...completedObjects.concat()])
         setHistoricSnapshots(historicSnapshots)
@@ -177,7 +172,7 @@ const Board = () => {
         isDrawing.current = false;
         let completedObject = holdingObjects['self'];
         completedObjects.push(completedObject)
-        setCompletedObjects(completedObjects.concat())
+        setCompletedObjects([...completedObjects.concat()])
         current.emit('objectEnd', {room, object: completedObject});
         holdingObjects['self'] = [];
         generateIncompleteObjects()
@@ -187,16 +182,16 @@ const Board = () => {
     /* For ending objects via an external user */
     const handleSocketUp = (user) => {
         completedObjects.push(holdingObjects[user])
-        setCompletedObjects(completedObjects.concat())
+        setCompletedObjects([...completedObjects.concat()])
         holdingObjects[user] = [];
         generateIncompleteObjects()
         generateHistoryStep()
     };
 
     /* For streaming objects from the database */
-    const handleStreamLine = (data) => {
+    const handleStreamObject = (data) => {
         completedObjects.push(data)
-        setCompletedObjects(completedObjects.concat());
+        setCompletedObjects([...completedObjects.concat()]);
         generateHistoryStep()
     }
 
@@ -209,24 +204,16 @@ const Board = () => {
     }
 
     const undoWhiteboard = () => {
-        console.log("UNDO:")
-        console.log(historyCount)
-        console.log(historicSnapshots)
         if (historyCount > 1) {
             setHistoryCount(historyCount - 1)
-            setCompletedObjects(historicSnapshots[(historyCount - 1) - 1])
+            setCompletedObjects([...historicSnapshots[(historyCount - 1) - 1]])
         }
     }
 
     const redoWhiteboard = () => {
-        console.log("REDO:")
-        console.log(historyCount)
-        console.log(historicSnapshots.length - 1)
-        console.log(historicSnapshots)
         if (historyCount <= historicSnapshots.length - 1) {
             setHistoryCount(historyCount + 1)
-            console.log(historyCount)
-            setCompletedObjects(historicSnapshots[historyCount])
+            setCompletedObjects([...historicSnapshots[historyCount]])
         }
     }
 
@@ -242,7 +229,8 @@ const Board = () => {
 
     const handleRedo = () => {
         redoWhiteboard()
-        current.emit('redoWhiteboard', room);
+        let latestLine = historicSnapshots[historyCount]
+        current.emit('redoWhiteboard', {room, object: latestLine[latestLine.length-1]});
     }
 
     const handleJoin = () => {
