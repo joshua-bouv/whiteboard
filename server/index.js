@@ -46,6 +46,14 @@ async function main(){
             }
         }
 
+        async function updateObjectOnBoard(board, data) {
+            try {
+                await whiteboards.collection(board).findOneAndUpdate({_id:data._id}, {$set: {}})
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
         async function clearBoard(board) {
             try {
                 await whiteboards.collection(board).deleteMany({});
@@ -102,11 +110,10 @@ async function main(){
                 socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
             });
 
-            socket.on('streamObject', (data) => {
-                data.object['user'] = socket.id;
-                console.log(data)
-                //addObjectToBoard(data.room, data)
-                //socket.emit('streamObject', data)
+            // To update an object on the whiteboard
+            socket.on('updateObject', (data) => {
+                //updateObjectOnBoard("123", data)
+                socket.to("123").broadcast.emit('updateObject', data);
             });
 
             // To clear whiteboard across all clients

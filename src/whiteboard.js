@@ -1,12 +1,27 @@
-import React, { setState, useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Line, Rect, Circle } from 'react-konva';
+import React, { useState, useRef, useEffect } from 'react';
+import { Stage, Layer, Line, Rect, Circle, Text } from 'react-konva';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
 import { faUndo } from '@fortawesome/free-solid-svg-icons'
 import { faRedo } from '@fortawesome/free-solid-svg-icons'
 import { faArrowsAlt } from '@fortawesome/free-solid-svg-icons'
+import { faExpand } from '@fortawesome/free-solid-svg-icons'
+import { faPen } from '@fortawesome/free-solid-svg-icons'
+import BoardRectangle from './Components/BoardRectangle'
+import BoardCircle from './Components/BoardCircle'
+
 import './styles/board.css';
 import io from "socket.io-client";
+
+function makeID(length) {
+    let result = '';
+    let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
 
 let current = io.connect(':8080/');
 current.emit('joinRoom', "123");
@@ -15,14 +30,17 @@ const Board = () => {
     const [tool, setTool] = useState('line');
     const [stroke, setStroke] = useState('#000000');
     const [isDragging, setDragging] = useState(false);
+    const [isResizing, setResizing] = useState(false);
+    const [isDrawingTool, setDrawingTool] = useState(false);
     let [incompleteObjects, setIncompleteObjects] = useState([]);
     let [completedObjects, setCompletedObjects] = useState([]);
-    const [holdingObjects, setHoldingObjects] = useState([]);
+    const holdingObjects = useRef([]);
     let [historicSnapshots, setHistoricSnapshots] = useState([]);
-    let [room, joinRoom] = useState("123");
+    let room = useRef("123");
     const outer = useRef(null);
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
+    const textRef = useRef(null);
     let [historyCount, setHistoryCount] = useState(0);
 
     const strokeButtons = [];
@@ -53,6 +71,7 @@ const Board = () => {
         current.on('drawing', handleSocketMove);
         current.on('objectEnd', handleSocketUp);
         current.on('streamObject', handleStreamObject);
+        current.on('updateObject', handleUpdateObject);
         current.on('clearWhiteboard', clearWhiteboard);
         current.on('undoWhiteboard', undoWhiteboard);
         current.on('redoWhiteboard', redoWhiteboard);
@@ -64,8 +83,8 @@ const Board = () => {
 
     const generateIncompleteObjects = () => {
         incompleteObjects = []
-        for (let key in holdingObjects) {
-            incompleteObjects.push(holdingObjects[key])
+        for (let key in holdingObjects.current) {
+            incompleteObjects.push(holdingObjects.current[key])
         }
         setIncompleteObjects(incompleteObjects.concat())
     }
@@ -80,7 +99,7 @@ const Board = () => {
     }
 
     const drawObject = (point, user) => {
-        let lastObject = holdingObjects[user]; // gets the latest object added to whiteboard
+        let lastObject = holdingObjects.current[user]; // gets the latest object added to whiteboard
 
         if (tool === "line" || tool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
@@ -108,45 +127,69 @@ const Board = () => {
         }
     };
 
+    const [selectedId, selectShape] = React.useState(null);
+
     /* For starting objects via the local user */
     const handleMouseDown = (e) => {
-        isDrawing.current = true;
+        if (isResizing) {
+            const clickedOnEmpty = e.target === e.target.getStage();
+            if (clickedOnEmpty) {
+                selectShape(null);
+            }
+        } else if (isDragging) {
 
-        if (holdingObjects['self'] == null) { // untested
-            holdingObjects['self'] = [];
+        } else if (isDrawingTool) {
+            isDrawing.current = true;
+
+            if (holdingObjects.current['self'] == null) { // untested
+                holdingObjects.current['self'] = [];
+            }
+
+            const pos = e.target.getStage().getPointerPosition();
+
+            if (tool === "line" || tool === "eraser") {
+                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], stroke };
+            } else if (tool === "square") {
+                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], size: [0, 0], stroke };
+            } else if (tool === "circle") {
+                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], radius: 0, stroke };
+            } else if (tool === "text") {
+                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], text:textRef.current.value, stroke };
+            }
+
+            if (tool === "text") {
+                current.emit('objectStart', {
+                    point: pos,
+                    tool,
+                    stroke,
+                    text: textRef.current.value
+                });
+            } else {
+                current.emit('objectStart', {
+                    point: pos,
+                    tool,
+                    stroke,
+                });
+            }
         }
-
-        const pos = e.target.getStage().getPointerPosition();
-
-        if (tool === "line" || tool === "eraser") {
-            holdingObjects['self'] = { tool, points: [pos.x, pos.y], stroke };
-        } else if (tool === "square") { // potentially other objects
-            holdingObjects['self'] = { tool, points: [pos.x, pos.y], size: [0, 0], stroke };
-        } else if (tool === "circle") {
-            holdingObjects['self'] = { tool, points: [pos.x, pos.y], radius: 0, stroke };
-        }
-
-        current.emit('objectStart', {
-            point: pos,
-            tool,
-            stroke
-        });
     };
 
     /* For starting objects via an external user */
     const handleSocketDown = (data) => {
-        if (holdingObjects[data.user] == null) { // untested
-            holdingObjects[data.user] = [];
+        if (holdingObjects.current[data.user] == null) { // untested
+            holdingObjects.current[data.user] = [];
         }
 
         const pos = data.point;
 
         if (data.tool === "line" || data.tool === "eraser") {
-            holdingObjects[data.user] = { tool, points: [pos.x, pos.y], stroke };
-        } else if (tool === "square") { // potentially other objects
-            holdingObjects[data.user] = { tool, points: [pos.x, pos.y], size: [0, 0], stroke };
+            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], stroke };
+        } else if (tool === "square") {
+            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], size: [0, 0], stroke };
         } else if (tool === "circle") {
-            holdingObjects[data.user] = { tool, points: [pos.x, pos.y], radius: 0, stroke };
+            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], radius: 0, stroke };
+        } else if (tool === "text") {
+            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], text:data.text, stroke};
         }
     };
 
@@ -169,28 +212,53 @@ const Board = () => {
 
     /* For ending objects via the local user */
     const handleMouseUp = () => {
-        isDrawing.current = false;
-        let completedObject = holdingObjects['self'];
-        completedObjects.push(completedObject)
-        setCompletedObjects([...completedObjects.concat()])
-        current.emit('objectEnd', {room, object: completedObject});
-        holdingObjects['self'] = [];
+        console.log("UP GONE")
+        if (isDrawingTool) {
+            console.log("BRUHHH")
+            isDrawing.current = false;
+            let completedObject = holdingObjects.current['self'];
+            completedObjects.push(completedObject)
+            setCompletedObjects([...completedObjects.concat()])
+            current.emit('objectEnd', {room:room.current, object: completedObject});
+            holdingObjects.current['self'] = [];
+        }
         generateIncompleteObjects()
         generateHistoryStep()
     };
 
     /* For ending objects via an external user */
     const handleSocketUp = (user) => {
-        completedObjects.push(holdingObjects[user])
+        completedObjects.push(holdingObjects.current[user])
         setCompletedObjects([...completedObjects.concat()])
-        holdingObjects[user] = [];
+        holdingObjects.current[user] = [];
         generateIncompleteObjects()
         generateHistoryStep()
     };
 
     /* For streaming objects from the database */
     const handleStreamObject = (data) => {
+        data.selectID = makeID(8)
         completedObjects.push(data)
+        setCompletedObjects([...completedObjects.concat()]);
+        generateHistoryStep()
+    }
+
+    /* For streaming objects from the database */
+    const handleUpdateObject = (data) => {
+        completedObjects.map((testobj, i) => {
+            if (testobj._id === data._id) {
+                if (data.tool === "square") {
+                    completedObjects[i].points[0] = data.points[0]
+                    completedObjects[i].points[1] = data.points[1]
+                    completedObjects[i].size[0] = data.size[0]
+                    completedObjects[i].size[1] = data.size[1]
+                } else if (data.tool === "circle") {
+                    completedObjects[i].points[0] = data.points[0]
+                    completedObjects[i].points[1] = data.points[1]
+                    completedObjects[i].radius = data.radius
+                }
+            }
+        });
         setCompletedObjects([...completedObjects.concat()]);
         generateHistoryStep()
     }
@@ -219,18 +287,18 @@ const Board = () => {
 
     const handleClear = () => {
         clearWhiteboard()
-        current.emit('clearWhiteboard', room);
+        current.emit('clearWhiteboard', room.current);
     }
 
     const handleUndo = () => {
         undoWhiteboard()
-        current.emit('undoWhiteboard', room);
+        current.emit('undoWhiteboard', room.current);
     }
 
     const handleRedo = () => {
         redoWhiteboard()
         let latestLine = historicSnapshots[historyCount]
-        current.emit('redoWhiteboard', {room, object: latestLine[latestLine.length-1]});
+        current.emit('redoWhiteboard', {room:room.current, object: latestLine[latestLine.length-1]});
     }
 
     const handleJoin = () => {
@@ -247,18 +315,55 @@ const Board = () => {
         }
     }
 
+    const handleResizeObjects = () => {
+        if (isResizing) {
+            setResizing(false)
+        } else {
+            setResizing(true)
+        }
+    }
+
+    const handleStartDrawing = () => {
+        if (isDrawingTool) {
+            setDrawingTool(false)
+        } else {
+            setDrawingTool(true)
+        }
+    }
+
+    var scaleBy = 0.95;
+    const handleMouseWheel = (e) => {
+        let stage = e.target.getStage()
+        let oldScale = stage.scaleX()
+        let pointer = stage.getPointerPosition()
+        let mousePointTo = {
+            x: (pointer.x - stage.x()) / oldScale,
+            y: (pointer.y - stage.y()) / oldScale,
+        };
+        let newScale = e.evt.deltaY > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+        stage.scale({ x: newScale, y: newScale });
+        let newPos = {
+            x: pointer.x - mousePointTo.x * newScale,
+            y: pointer.y - mousePointTo.y * newScale,
+        };
+        stage.position(newPos);
+        stage.batchDraw();
+    }
+
     return (
         <div>
             <Stage
                 width={window.innerWidth}
                 height={window.innerHeight}
+                draggable={false}
                 onMouseDown={handleMouseDown}
                 onMousemove={handleMouseMove}
                 onMouseup={handleMouseUp}
+                onWheel={handleMouseWheel}
             >
                 <Layer
                     ref={outer}
-                    listening={isDragging}
+                    listening={true}
                 >
                     {
                         incompleteObjects.map((object, i) => {
@@ -326,27 +431,59 @@ const Board = () => {
                                 )
                             } else if (object.tool === "square") {
                                 return (
-                                    <Rect
+                                    <BoardRectangle
                                         key={i}
-                                        x={object.points[0]}
-                                        y={object.points[1]}
-                                        width={object.size[0]}
-                                        height={object.size[1]}
-                                        fill={object.stroke}
-                                        draggable={isDragging}
-                                        listening={isDragging}
+                                        shapeProps={object}
+                                        isSelected={object.selectID === selectedId}
+                                        onSelect={() => {
+                                            selectShape(object.selectID);
+                                        }}
+                                        onChange={(newAttrs) => {
+                                            completedObjects.map((testobj, i) => {
+                                                if (testobj.selectID === newAttrs.key) {
+                                                    completedObjects[i].points[0] = newAttrs.x
+                                                    completedObjects[i].points[1] = newAttrs.y
+                                                    completedObjects[i].size[0] = newAttrs.width
+                                                    completedObjects[i].size[1] = newAttrs.height
+                                                    current.emit('updateObject', completedObjects[i]);
+                                                }
+                                            });
+                                            setCompletedObjects([...completedObjects.concat()])
+                                        }}
                                     />
                                 )
                             } else if (object.tool === "circle") {
                                 return (
-                                    <Circle
+                                    <BoardCircle
+                                        key={i}
+                                        shapeProps={object}
+                                        isSelected={object.selectID === selectedId}
+                                        onSelect={() => {
+                                            selectShape(object.selectID);
+                                        }}
+                                        onChange={(newAttrs) => {
+                                            completedObjects.map((testobj, i) => {
+                                                if (testobj.selectID === newAttrs.key) {
+                                                    completedObjects[i].points[0] = newAttrs.x
+                                                    completedObjects[i].points[1] = newAttrs.y
+                                                    completedObjects[i].radius = newAttrs.radius
+                                                    current.emit('updateObject', completedObjects[i]);
+                                                }
+                                            });
+                                            setCompletedObjects([...completedObjects.concat()])
+                                        }}
+                                    />
+                                )
+                            } else if (object.tool === "text") {
+                                return (
+                                    <Text
                                         key={i}
                                         x={object.points[0]}
                                         y={object.points[1]}
-                                        radius={object.radius}
+                                        text={object.text}
                                         fill={object.stroke}
-                                        draggable={isDragging}
-                                        listening={isDragging}
+                                        fontFamily={'Calibri'}
+                                        fontSize={18}
                                     />
                                 )
                             }
@@ -365,18 +502,21 @@ const Board = () => {
                 <option value="eraser">Eraser</option>
                 <option value="square">Square</option>
                 <option value="circle">Circle</option>
+                <option value="text">Text</option>
             </select>
             <div className="colors">
                 {strokeButtons}
             </div>
             <div className="buttons">
-                <textarea defaultValue='example text'/>
+                <textarea ref={textRef} defaultValue='example text'/>
                 <button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
-                <textarea ref={roomIDRef} defaultValue={room}/>
+                <textarea ref={roomIDRef} defaultValue={room.current}/>
                 <button className="button toolsL" onClick={handleJoin}>Join room</button>
                 <button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faUndo} /></button>
                 <button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faRedo} /></button>
+                <button className="button tools" onClick={handleStartDrawing}><FontAwesomeIcon icon={faPen} /></button>
                 <button className="button tools" onClick={handleMoveObjects}><FontAwesomeIcon icon={faArrowsAlt} /></button>
+                <button className="button tools" onClick={handleResizeObjects}><FontAwesomeIcon icon={faExpand} /></button>
             </div>
         </div>
     );
