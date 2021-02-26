@@ -27,21 +27,24 @@ let current = io.connect(':8080/');
 current.emit('joinRoom', "123");
 
 const Board = () => {
-    const [tool, setTool] = useState('line');
-    const [stroke, setStroke] = useState('#000000');
-    const [isDragging, setDragging] = useState(false);
-    const [isResizing, setResizing] = useState(false);
-    const [isDrawingTool, setDrawingTool] = useState(false);
+    const tools = useRef({
+        tool: 'line',
+        stroke: '#000000',
+        isDragging: false,
+        isResizing: false,
+        isDrawingTool: false
+    })
+
     let [incompleteObjects, setIncompleteObjects] = useState([]);
     let [completedObjects, setCompletedObjects] = useState([]);
     const holdingObjects = useRef([]);
-    let [historicSnapshots, setHistoricSnapshots] = useState([]);
+    let historicSnapshots = useRef([]);
+    let historyCount = useRef(0);
     let room = useRef("123");
     const outer = useRef(null);
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
     const textRef = useRef(null);
-    let [historyCount, setHistoryCount] = useState(0);
 
     const strokeButtons = [];
     const strokes = {
@@ -58,9 +61,9 @@ const Board = () => {
         strokeButtons.push(
             <div
                 key={key}
-                value={stroke}
+                value={tools.current.stroke}
                 onClick={() => {
-                    setStroke(strokes[key]);
+                    tools.current.stroke = strokes[key];
                 }}
                 className={"color "+key}
             />)
@@ -90,26 +93,25 @@ const Board = () => {
     }
 
     const generateHistoryStep = () => {
-        if (historyCount !== historicSnapshots.length) {
-            historicSnapshots = historicSnapshots.slice(0, historyCount)
+        if (historyCount.current !== historicSnapshots.current.length) {
+            historicSnapshots.current = historicSnapshots.current.slice(0, historyCount.current)
         }
-        setHistoryCount(historyCount + 1)
-        historicSnapshots.push([...completedObjects.concat()])
-        setHistoricSnapshots(historicSnapshots)
+        historyCount.current += 1
+        historicSnapshots.current.push([...completedObjects.concat()])
     }
 
     const drawObject = (point, user) => {
         let lastObject = holdingObjects.current[user]; // gets the latest object added to whiteboard
 
-        if (tool === "line" || tool === "eraser") {
+        if (tools.current.tool === "line" || tools.current.tool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
             generateIncompleteObjects()
-        } else if (tool === "square") { // potentially other objects
+        } else if (tools.current.tool === "square") { // potentially other objects
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
             lastObject.size = [x, y]; // update size of object
             generateIncompleteObjects()
-        } else if (tool === "circle") {
+        } else if (tools.current.tool === "circle") {
             let radius;
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
@@ -131,14 +133,14 @@ const Board = () => {
 
     /* For starting objects via the local user */
     const handleMouseDown = (e) => {
-        if (isResizing) {
+        if (tools.current.isResizing) {
             const clickedOnEmpty = e.target === e.target.getStage();
             if (clickedOnEmpty) {
                 selectShape(null);
             }
-        } else if (isDragging) {
+        } else if (tools.current.isDragging) {
 
-        } else if (isDrawingTool) {
+        } else if (tools.current.isDrawingTool) {
             isDrawing.current = true;
 
             if (holdingObjects.current['self'] == null) { // untested
@@ -147,28 +149,30 @@ const Board = () => {
 
             const pos = e.target.getStage().getPointerPosition();
 
-            if (tool === "line" || tool === "eraser") {
-                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], stroke };
-            } else if (tool === "square") {
-                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], size: [0, 0], stroke };
-            } else if (tool === "circle") {
-                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], radius: 0, stroke };
-            } else if (tool === "text") {
-                holdingObjects.current['self'] = { selectID: makeID(8), tool, points: [pos.x, pos.y], text:textRef.current.value, stroke };
+            if (tools.current.tool === "line" || tools.current.tool === "eraser") {
+                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], stroke:tools.current.stroke };
+            } else if (tools.current.tool === "square") {
+                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke:tools.current.stroke };
+            } else if (tools.current.tool === "circle") {
+                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
+            } else if (tools.current.tool === "text") {
+                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], text:textRef.current.value, stroke:tools.current.stroke };
             }
 
-            if (tool === "text") {
+            generateIncompleteObjects()
+
+            if (tools.current.tool === "text") {
                 current.emit('objectStart', {
                     point: pos,
-                    tool,
-                    stroke,
+                    tool:tools.current.tool,
+                    stroke:tools.current.stroke,
                     text: textRef.current.value
                 });
             } else {
                 current.emit('objectStart', {
                     point: pos,
-                    tool,
-                    stroke,
+                    tool:tools.current.tool,
+                    stroke:tools.current.stroke,
                 });
             }
         }
@@ -183,13 +187,13 @@ const Board = () => {
         const pos = data.point;
 
         if (data.tool === "line" || data.tool === "eraser") {
-            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], stroke };
-        } else if (tool === "square") {
-            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], size: [0, 0], stroke };
-        } else if (tool === "circle") {
-            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], radius: 0, stroke };
-        } else if (tool === "text") {
-            holdingObjects.current[data.user] = { selectID: makeID(8), tool, points: [pos.x, pos.y], text:data.text, stroke};
+            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], stroke:data.stroke };
+        } else if (data.tool === "square") {
+            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], size: [0, 0], stroke:data.stroke };
+        } else if (data.tool === "circle") {
+            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], radius: 0, stroke:data.stroke };
+        } else if (data.tool === "text") {
+            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], text:data.text, stroke:data.stroke };
         }
     };
 
@@ -212,9 +216,7 @@ const Board = () => {
 
     /* For ending objects via the local user */
     const handleMouseUp = () => {
-        console.log("UP GONE")
-        if (isDrawingTool) {
-            console.log("BRUHHH")
+        if (tools.current.isDrawingTool) {
             isDrawing.current = false;
             let completedObject = holdingObjects.current['self'];
             completedObjects.push(completedObject)
@@ -223,7 +225,7 @@ const Board = () => {
             holdingObjects.current['self'] = [];
         }
         generateIncompleteObjects()
-        generateHistoryStep()
+        generateHistoryStep() // probs needs moving
     };
 
     /* For ending objects via an external user */
@@ -237,9 +239,11 @@ const Board = () => {
 
     /* For streaming objects from the database */
     const handleStreamObject = (data) => {
-        data.selectID = makeID(8)
-        completedObjects.push(data)
-        setCompletedObjects([...completedObjects.concat()]);
+//        data.selectID = data._id
+        console.log("Object streamed to client")
+        console.log({...data})
+        completedObjects.push({...data})
+        setTimeout(function(){ setCompletedObjects([...completedObjects.concat()]); }, 10);
         generateHistoryStep()
     }
 
@@ -272,16 +276,16 @@ const Board = () => {
     }
 
     const undoWhiteboard = () => {
-        if (historyCount > 1) {
-            setHistoryCount(historyCount - 1)
-            setCompletedObjects([...historicSnapshots[(historyCount - 1) - 1]])
+        if (historyCount.current > 1) {
+            historyCount.current -= 1
+            setCompletedObjects([...historicSnapshots.current[(historyCount.current-1) - 1]])
         }
     }
 
     const redoWhiteboard = () => {
-        if (historyCount <= historicSnapshots.length - 1) {
-            setHistoryCount(historyCount + 1)
-            setCompletedObjects([...historicSnapshots[historyCount]])
+        if (historyCount.current <= historicSnapshots.current.length - 1) {
+            historyCount.current += 1
+            setCompletedObjects([...historicSnapshots.current[historyCount.current]])
         }
     }
 
@@ -297,7 +301,7 @@ const Board = () => {
 
     const handleRedo = () => {
         redoWhiteboard()
-        let latestLine = historicSnapshots[historyCount]
+        let latestLine = historicSnapshots.current[historyCount.current]
         current.emit('redoWhiteboard', {room:room.current, object: latestLine[latestLine.length-1]});
     }
 
@@ -308,27 +312,15 @@ const Board = () => {
     }
 
     const handleMoveObjects = () => {
-        if (isDragging) {
-            setDragging(false)
-        } else {
-            setDragging(true)
-        }
+        tools.current.isDragging = !tools.current.isDragging;
     }
 
     const handleResizeObjects = () => {
-        if (isResizing) {
-            setResizing(false)
-        } else {
-            setResizing(true)
-        }
+        tools.current.isResizing = !tools.current.isResizing;
     }
 
     const handleStartDrawing = () => {
-        if (isDrawingTool) {
-            setDrawingTool(false)
-        } else {
-            setDrawingTool(true)
-        }
+        tools.current.isDrawingTool = !tools.current.isDrawingTool;
     }
 
     var scaleBy = 0.95;
@@ -411,6 +403,8 @@ const Board = () => {
                             }
                         })
                     }
+                    {console.log("WHITEBOARD RE-RENDER:")}
+                    {console.log({...completedObjects})}
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -425,8 +419,8 @@ const Board = () => {
                                         globalCompositeOperation={
                                             object.tool === 'eraser' ? 'destination-out' : 'source-over'
                                         }
-                                        draggable={isDragging}
-                                        listening={isDragging}
+                                        draggable={tools.current.isDragging}
+                                        listening={tools.current.isDragging}
                                     />
                                 )
                             } else if (object.tool === "square") {
@@ -493,9 +487,9 @@ const Board = () => {
             </Stage>
             <select
                 className="select"
-                value={tool}
+                value={tools.current.tool}
                 onChange={(e) => {
-                    setTool(e.target.value);
+                    tools.current.tool = e.target.value;
                 }}
             >
                 <option value="line">Line</option>
