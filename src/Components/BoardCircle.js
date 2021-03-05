@@ -2,6 +2,7 @@ import React from "react";
 import {Circle, Transformer} from "react-konva";
 
 const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange }) => {
+    console.log(isSelected)
     const shapeRef = React.useRef();
     const trRef = React.useRef();
 

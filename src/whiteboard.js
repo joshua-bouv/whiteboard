@@ -13,16 +13,6 @@ import BoardCircle from './Components/BoardCircle'
 import './styles/board.css';
 import io from "socket.io-client";
 
-function makeID(length) {
-    let result = '';
-    let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let charactersLength = characters.length;
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-}
-
 let current = io.connect(':8080/');
 current.emit('joinRoom', "123");
 
@@ -32,7 +22,7 @@ const Board = () => {
         stroke: '#000000',
         isDragging: false,
         isResizing: false,
-        isDrawingTool: false
+        isDrawingTool: true
     })
 
     let [incompleteObjects, setIncompleteObjects] = useState([]);
@@ -135,6 +125,8 @@ const Board = () => {
     const handleMouseDown = (e) => {
         if (tools.current.isResizing) {
             const clickedOnEmpty = e.target === e.target.getStage();
+            console.log("---")
+            console.log(clickedOnEmpty)
             if (clickedOnEmpty) {
                 selectShape(null);
             }
@@ -150,13 +142,13 @@ const Board = () => {
             const pos = e.target.getStage().getPointerPosition();
 
             if (tools.current.tool === "line" || tools.current.tool === "eraser") {
-                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], stroke:tools.current.stroke };
             } else if (tools.current.tool === "square") {
-                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke:tools.current.stroke };
             } else if (tools.current.tool === "circle") {
-                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
             } else if (tools.current.tool === "text") {
-                holdingObjects.current['self'] = { selectID: 1, tool:tools.current.tool, points: [pos.x, pos.y], text:textRef.current.value, stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], text:textRef.current.value, stroke:tools.current.stroke };
             }
 
             generateIncompleteObjects()
@@ -187,13 +179,13 @@ const Board = () => {
         const pos = data.point;
 
         if (data.tool === "line" || data.tool === "eraser") {
-            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], stroke:data.stroke };
         } else if (data.tool === "square") {
-            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], size: [0, 0], stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], size: [0, 0], stroke:data.stroke };
         } else if (data.tool === "circle") {
-            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], radius: 0, stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], radius: 0, stroke:data.stroke };
         } else if (data.tool === "text") {
-            holdingObjects.current[data.user] = { selectID: 1, tool:data.tool, points: [pos.x, pos.y], text:data.text, stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], text:data.text, stroke:data.stroke };
         }
     };
 
@@ -240,8 +232,6 @@ const Board = () => {
     /* For streaming objects from the database */
     const handleStreamObject = (data) => {
 //        data.selectID = data._id
-        console.log("Object streamed to client")
-        console.log({...data})
         completedObjects.push({...data})
         setTimeout(function(){ setCompletedObjects([...completedObjects.concat()]); }, 10);
         generateHistoryStep()
@@ -313,13 +303,19 @@ const Board = () => {
 
     const handleMoveObjects = () => {
         tools.current.isDragging = !tools.current.isDragging;
+        tools.current.isResizing = false
+        tools.current.isDrawingTool = false
     }
 
     const handleResizeObjects = () => {
+        tools.current.isDragging = false
         tools.current.isResizing = !tools.current.isResizing;
+        tools.current.isDrawingTool = false
     }
 
     const handleStartDrawing = () => {
+        tools.current.isDragging = false
+        tools.current.isResizing = false
         tools.current.isDrawingTool = !tools.current.isDrawingTool;
     }
 
@@ -403,8 +399,6 @@ const Board = () => {
                             }
                         })
                     }
-                    {console.log("WHITEBOARD RE-RENDER:")}
-                    {console.log({...completedObjects})}
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -434,7 +428,7 @@ const Board = () => {
                                         }}
                                         onChange={(newAttrs) => {
                                             completedObjects.map((testobj, i) => {
-                                                if (testobj.selectID === newAttrs.key) {
+                                                if (testobj.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].size[0] = newAttrs.width
@@ -442,6 +436,7 @@ const Board = () => {
                                                     current.emit('updateObject', completedObjects[i]);
                                                 }
                                             });
+                                            console.log(completedObjects)
                                             setCompletedObjects([...completedObjects.concat()])
                                         }}
                                     />
@@ -457,7 +452,7 @@ const Board = () => {
                                         }}
                                         onChange={(newAttrs) => {
                                             completedObjects.map((testobj, i) => {
-                                                if (testobj.selectID === newAttrs.key) {
+                                                if (testobj.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].radius = newAttrs.radius
