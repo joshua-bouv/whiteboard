@@ -1,8 +1,7 @@
 import React from "react";
 import {Circle, Transformer} from "react-konva";
 
-const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange }) => {
-    console.log(isSelected)
+const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) => {
     const shapeRef = React.useRef();
     const trRef = React.useRef();
 
@@ -12,14 +11,16 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange }) => {
         y:shapeProps.points[1],
         radius:shapeProps.radius,
         fill:shapeProps.stroke,
-        draggable:true,
+        draggable:onCanMove,
         listening:true,
     }
 
     React.useEffect(() => {
-        if (isSelected) {
-            trRef.current.nodes([shapeRef.current]);
-            trRef.current.getLayer().batchDraw();
+        if (onCanMove) {
+            if (isSelected) {
+                trRef.current.nodes([shapeRef.current]);
+                trRef.current.getLayer().batchDraw();
+            }
         }
     }, [isSelected]);
 
@@ -30,7 +31,7 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange }) => {
                 onTap={onSelect}
                 ref={shapeRef}
                 {...shapeProps}
-                draggable
+                onCanMove
                 onDragEnd={(e) => {
                     onChange({
                         ...shapeProps,

@@ -1,7 +1,7 @@
 import React from "react";
 import {Rect, Transformer} from "react-konva";
 
-const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange }) => {
+const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) => {
     const shapeRef = React.useRef();
     const trRef = React.useRef();
 
@@ -17,9 +17,11 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange }) => {
     }
 
     React.useEffect(() => {
-        if (isSelected) {
-            trRef.current.nodes([shapeRef.current]);
-            trRef.current.getLayer().batchDraw();
+        if (onCanMove) {
+            if (isSelected) {
+                trRef.current.nodes([shapeRef.current]);
+                trRef.current.getLayer().batchDraw();
+            }
         }
     }, [isSelected]);
 

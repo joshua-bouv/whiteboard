@@ -20,9 +20,6 @@ const Board = () => {
     const tools = useRef({
         tool: 'line',
         stroke: '#000000',
-        isDragging: false,
-        isResizing: false,
-        isDrawingTool: true
     })
 
     let [incompleteObjects, setIncompleteObjects] = useState([]);
@@ -35,6 +32,10 @@ const Board = () => {
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
     const textRef = useRef(null);
+
+    let [isDragging, setIsDragging] = useState(false);
+    let [isResizing, setIsResizing] = useState(false);
+    let [isDrawingTool, setIsDrawingTool] = useState(true);
 
     const strokeButtons = [];
     const strokes = {
@@ -123,16 +124,16 @@ const Board = () => {
 
     /* For starting objects via the local user */
     const handleMouseDown = (e) => {
-        if (tools.current.isResizing) {
+        if (isResizing) {
             const clickedOnEmpty = e.target === e.target.getStage();
             console.log("---")
             console.log(clickedOnEmpty)
             if (clickedOnEmpty) {
                 selectShape(null);
             }
-        } else if (tools.current.isDragging) {
+        } else if (isDragging) {
 
-        } else if (tools.current.isDrawingTool) {
+        } else if (isDrawingTool) {
             isDrawing.current = true;
 
             if (holdingObjects.current['self'] == null) { // untested
@@ -208,7 +209,7 @@ const Board = () => {
 
     /* For ending objects via the local user */
     const handleMouseUp = () => {
-        if (tools.current.isDrawingTool) {
+        if (isDrawingTool) {
             isDrawing.current = false;
             let completedObject = holdingObjects.current['self'];
             completedObjects.push(completedObject)
@@ -302,21 +303,21 @@ const Board = () => {
     }
 
     const handleMoveObjects = () => {
-        tools.current.isDragging = !tools.current.isDragging;
-        tools.current.isResizing = false
-        tools.current.isDrawingTool = false
+        isDragging = setIsDragging(!isDragging);
+        isResizing = setIsResizing(false);
+        isDrawingTool = setIsDrawingTool(false);
     }
 
     const handleResizeObjects = () => {
-        tools.current.isDragging = false
-        tools.current.isResizing = !tools.current.isResizing;
-        tools.current.isDrawingTool = false
+        isDragging = setIsDragging(false);
+        isResizing = setIsResizing(!isResizing);
+        isDrawingTool = setIsDrawingTool(false);
     }
 
     const handleStartDrawing = () => {
-        tools.current.isDragging = false
-        tools.current.isResizing = false
-        tools.current.isDrawingTool = !tools.current.isDrawingTool;
+        isDragging = setIsDragging(false);
+        isResizing = setIsResizing(false);
+        isDrawingTool = setIsDrawingTool(!isDrawingTool);
     }
 
     var scaleBy = 0.95;
@@ -399,6 +400,8 @@ const Board = () => {
                             }
                         })
                     }
+                    {console.log("bruh")}
+                    {console.log(completedObjects)}
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -413,8 +416,8 @@ const Board = () => {
                                         globalCompositeOperation={
                                             object.tool === 'eraser' ? 'destination-out' : 'source-over'
                                         }
-                                        draggable={tools.current.isDragging}
-                                        listening={tools.current.isDragging}
+                                        draggable={isDragging}
+                                        listening={isDragging}
                                     />
                                 )
                             } else if (object.tool === "square") {
@@ -439,6 +442,7 @@ const Board = () => {
                                             console.log(completedObjects)
                                             setCompletedObjects([...completedObjects.concat()])
                                         }}
+                                        onCanMove={isDragging}
                                     />
                                 )
                             } else if (object.tool === "circle") {
@@ -461,6 +465,7 @@ const Board = () => {
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
                                         }}
+                                        onCanMove={isDragging}
                                     />
                                 )
                             } else if (object.tool === "text") {
