@@ -9,12 +9,42 @@ import { faExpand } from '@fortawesome/free-solid-svg-icons'
 import { faPen } from '@fortawesome/free-solid-svg-icons'
 import BoardRectangle from './Components/BoardRectangle'
 import BoardCircle from './Components/BoardCircle'
+import { makeStyles } from '@material-ui/core/styles';
+
+import Container from '@material-ui/core/Container';
+import List from '@material-ui/core/List';
+import ListItem from '@material-ui/core/ListItem';
+import IconButton from '@material-ui/core/IconButton';
+
+import CreateIcon from '@material-ui/icons/Create';
+import PaletteIcon from '@material-ui/icons/Palette';
+import AspectRatioIcon from '@material-ui/icons/AspectRatio';
+import UndoIcon from '@material-ui/icons/Undo';
+import RedoIcon from '@material-ui/icons/Redo';
+import DeleteIcon from '@material-ui/icons/Delete';
 
 import './styles/board.css';
 import io from "socket.io-client";
 
 let current = io.connect(':8080/');
 current.emit('joinRoom', "123");
+
+const useStyles = makeStyles({
+    root: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        maxWidth: 130,
+        paddingLeft: 10,
+        paddingRight: 5,
+    },
+    button: {
+        paddingTop: 2,
+        paddingBottom: 2,
+        paddingLeft: 0,
+        paddingRight: 0,
+    },
+});
 
 const Board = () => {
     const tools = useRef({
@@ -32,6 +62,7 @@ const Board = () => {
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
     const textRef = useRef(null);
+    const classes = useStyles();
 
     let [isDragging, setIsDragging] = useState(false);
     let [isResizing, setIsResizing] = useState(false);
@@ -124,15 +155,13 @@ const Board = () => {
 
     /* For starting objects via the local user */
     const handleMouseDown = (e) => {
-        if (isResizing) {
+        if (isResizing || isDragging) {
             const clickedOnEmpty = e.target === e.target.getStage();
             console.log("---")
             console.log(clickedOnEmpty)
             if (clickedOnEmpty) {
                 selectShape(null);
             }
-        } else if (isDragging) {
-
         } else if (isDrawingTool) {
             isDrawing.current = true;
 
@@ -400,8 +429,6 @@ const Board = () => {
                             }
                         })
                     }
-                    {console.log("bruh")}
-                    {console.log(completedObjects)}
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -439,7 +466,6 @@ const Board = () => {
                                                     current.emit('updateObject', completedObjects[i]);
                                                 }
                                             });
-                                            console.log(completedObjects)
                                             setCompletedObjects([...completedObjects.concat()])
                                         }}
                                         onCanMove={isDragging}
@@ -485,35 +511,71 @@ const Board = () => {
                     }
                 </Layer>
             </Stage>
-            <select
-                className="select"
-                value={tools.current.tool}
-                onChange={(e) => {
-                    tools.current.tool = e.target.value;
-                }}
-            >
-                <option value="line">Line</option>
-                <option value="eraser">Eraser</option>
-                <option value="square">Square</option>
-                <option value="circle">Circle</option>
-                <option value="text">Text</option>
-            </select>
-            <div className="colors">
-                {strokeButtons}
-            </div>
-            <div className="buttons">
-                <textarea ref={textRef} defaultValue='example text'/>
-                <button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
-                <textarea ref={roomIDRef} defaultValue={room.current}/>
-                <button className="button toolsL" onClick={handleJoin}>Join room</button>
-                <button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faUndo} /></button>
-                <button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faRedo} /></button>
-                <button className="button tools" onClick={handleStartDrawing}><FontAwesomeIcon icon={faPen} /></button>
-                <button className="button tools" onClick={handleMoveObjects}><FontAwesomeIcon icon={faArrowsAlt} /></button>
-                <button className="button tools" onClick={handleResizeObjects}><FontAwesomeIcon icon={faExpand} /></button>
-            </div>
+            <Container className={classes.root} maxWidth="sm">
+                <List component="nav">
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Draw">
+                            <CreateIcon />
+                        </IconButton>
+                    </ListItem>
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Colours">
+                            <PaletteIcon />
+                        </IconButton>
+                    </ListItem>
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Manipulate">
+                            <AspectRatioIcon />
+                        </IconButton>
+                    </ListItem>
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Undo">
+                            <UndoIcon />
+                        </IconButton>
+                    </ListItem>
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Redo">
+                            <RedoIcon />
+                        </IconButton>
+                    </ListItem>
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Clear" onClick={handleClear}>
+                            <DeleteIcon />
+                        </IconButton>
+                    </ListItem>
+                </List>
+            </Container>
         </div>
     );
 };
 
 export default Board
+/*
+<select
+className="select"
+value={tools.current.tool}
+onChange={(e) => {
+    tools.current.tool = e.target.value;
+}}
+>
+<option value="line">Line</option>
+<option value="eraser">Eraser</option>
+<option value="square">Square</option>
+<option value="circle">Circle</option>
+<option value="text">Text</option>
+</select>
+<div className="colors">
+{strokeButtons}
+</div>
+<div className="buttons">
+<textarea ref={textRef} defaultValue='example text'/>
+<button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
+<textarea ref={roomIDRef} defaultValue={room.current}/>
+<button className="button toolsL" onClick={handleJoin}>Join room</button>
+<button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faUndo} /></button>
+<button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faRedo} /></button>
+<button className="button tools" onClick={handleStartDrawing}><FontAwesomeIcon icon={faPen} /></button>
+<button className="button tools" onClick={handleMoveObjects}><FontAwesomeIcon icon={faArrowsAlt} /></button>
+<button className="button tools" onClick={handleResizeObjects}><FontAwesomeIcon icon={faExpand} /></button>
+</div>
+*/
