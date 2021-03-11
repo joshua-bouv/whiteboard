@@ -330,14 +330,14 @@ const Board = () => {
     }
 
     const handleMoveObjects = () => {
-        isDragging = setIsDragging(!isDragging);
+        isDragging = setIsDragging(true);
         isDrawingTool = setIsDrawingTool(false);
         setAnchorEl(null);
     }
 
     const handleStartDrawing = () => {
         isDragging = setIsDragging(false);
-        isDrawingTool = setIsDrawingTool(!isDrawingTool);
+        isDrawingTool = setIsDrawingTool(true);
         setAnchorEl(null);
     }
 
@@ -534,13 +534,13 @@ const Board = () => {
                         horizontal: 'left',
                     }}
                 >
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = 'line'}}>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "line"}}>
                         <GestureIcon />
                     </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = 'square'}}>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "square"}}>
                         <CheckBoxOutlineBlankIcon />
                     </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = 'circle'}}>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "circle"}}>
                         <RadioButtonUncheckedIcon />
                     </IconButton>
                 </Popover>
