@@ -1,12 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Rect, Circle, Text } from 'react-konva';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash } from '@fortawesome/free-solid-svg-icons'
-import { faUndo } from '@fortawesome/free-solid-svg-icons'
-import { faRedo } from '@fortawesome/free-solid-svg-icons'
-import { faArrowsAlt } from '@fortawesome/free-solid-svg-icons'
-import { faExpand } from '@fortawesome/free-solid-svg-icons'
-import { faPen } from '@fortawesome/free-solid-svg-icons'
 import BoardRectangle from './Components/BoardRectangle'
 import BoardCircle from './Components/BoardCircle'
 import { makeStyles } from '@material-ui/core/styles';
@@ -15,6 +8,7 @@ import Container from '@material-ui/core/Container';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import IconButton from '@material-ui/core/IconButton';
+import Popover from '@material-ui/core/Popover';
 
 import CreateIcon from '@material-ui/icons/Create';
 import PaletteIcon from '@material-ui/icons/Palette';
@@ -22,6 +16,9 @@ import AspectRatioIcon from '@material-ui/icons/AspectRatio';
 import UndoIcon from '@material-ui/icons/Undo';
 import RedoIcon from '@material-ui/icons/Redo';
 import DeleteIcon from '@material-ui/icons/Delete';
+import GestureIcon from '@material-ui/icons/Gesture';
+import CheckBoxOutlineBlankIcon from '@material-ui/icons/CheckBoxOutlineBlank';
+import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 
 import './styles/board.css';
 import io from "socket.io-client";
@@ -65,8 +62,7 @@ const Board = () => {
     const classes = useStyles();
 
     let [isDragging, setIsDragging] = useState(false);
-    let [isResizing, setIsResizing] = useState(false);
-    let [isDrawingTool, setIsDrawingTool] = useState(true);
+    let [isDrawingTool, setIsDrawingTool] = useState(false);
 
     const strokeButtons = [];
     const strokes = {
@@ -155,7 +151,7 @@ const Board = () => {
 
     /* For starting objects via the local user */
     const handleMouseDown = (e) => {
-        if (isResizing || isDragging) {
+        if (isDragging) {
             const clickedOnEmpty = e.target === e.target.getStage();
             console.log("---")
             console.log(clickedOnEmpty)
@@ -298,14 +294,16 @@ const Board = () => {
     const undoWhiteboard = () => {
         if (historyCount.current > 1) {
             historyCount.current -= 1
-            setCompletedObjects([...historicSnapshots.current[(historyCount.current-1) - 1]])
+            setCompletedObjects([...historicSnapshots.current[(historyCount.current) - 1]])
         }
     }
 
     const redoWhiteboard = () => {
+        console.log(historyCount.current)
+        console.log(...[historicSnapshots.current])
         if (historyCount.current <= historicSnapshots.current.length - 1) {
-            historyCount.current += 1
             setCompletedObjects([...historicSnapshots.current[historyCount.current]])
+            historyCount.current += 1
         }
     }
 
@@ -321,7 +319,7 @@ const Board = () => {
 
     const handleRedo = () => {
         redoWhiteboard()
-        let latestLine = historicSnapshots.current[historyCount.current]
+        let latestLine = historicSnapshots.current[historyCount.current-1]
         current.emit('redoWhiteboard', {room:room.current, object: latestLine[latestLine.length-1]});
     }
 
@@ -333,20 +331,14 @@ const Board = () => {
 
     const handleMoveObjects = () => {
         isDragging = setIsDragging(!isDragging);
-        isResizing = setIsResizing(false);
         isDrawingTool = setIsDrawingTool(false);
-    }
-
-    const handleResizeObjects = () => {
-        isDragging = setIsDragging(false);
-        isResizing = setIsResizing(!isResizing);
-        isDrawingTool = setIsDrawingTool(false);
+        setAnchorEl(null);
     }
 
     const handleStartDrawing = () => {
         isDragging = setIsDragging(false);
-        isResizing = setIsResizing(false);
         isDrawingTool = setIsDrawingTool(!isDrawingTool);
+        setAnchorEl(null);
     }
 
     var scaleBy = 0.95;
@@ -367,6 +359,19 @@ const Board = () => {
         stage.position(newPos);
         stage.batchDraw();
     }
+
+    const [anchorEl, setAnchorEl] = React.useState(null);
+
+    const handleClick = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
+    const open = Boolean(anchorEl);
+    const id = open ? 'simple-popover' : undefined;
 
     return (
         <div>
@@ -429,6 +434,7 @@ const Board = () => {
                             }
                         })
                     }
+                    {console.log(completedObjects)}
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -512,9 +518,35 @@ const Board = () => {
                 </Layer>
             </Stage>
             <Container className={classes.root} maxWidth="sm">
+                <Popover
+                    id={id}
+                    open={open}
+                    anchorEl={anchorEl}
+                    onClose={handleClose}
+                    anchorReference="anchorPosition"
+                    anchorPosition={{ top: 0, left: 70 }}
+                    anchorOrigin={{
+                        vertical: 'top',
+                        horizontal: 'left',
+                    }}
+                    transformOrigin={{
+                        vertical: 'top',
+                        horizontal: 'left',
+                    }}
+                >
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = 'line'}}>
+                        <GestureIcon />
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = 'square'}}>
+                        <CheckBoxOutlineBlankIcon />
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = 'circle'}}>
+                        <RadioButtonUncheckedIcon />
+                    </IconButton>
+                </Popover>
                 <List component="nav">
                     <ListItem className={classes.button}>
-                        <IconButton aria-label="Draw">
+                        <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={handleClick}>
                             <CreateIcon />
                         </IconButton>
                     </ListItem>
@@ -524,17 +556,17 @@ const Board = () => {
                         </IconButton>
                     </ListItem>
                     <ListItem className={classes.button}>
-                        <IconButton aria-label="Manipulate">
+                        <IconButton aria-label="Manipulate" onClick={handleMoveObjects}>
                             <AspectRatioIcon />
                         </IconButton>
                     </ListItem>
                     <ListItem className={classes.button}>
-                        <IconButton aria-label="Undo">
+                        <IconButton aria-label="Undo" onClick={handleUndo}>
                             <UndoIcon />
                         </IconButton>
                     </ListItem>
                     <ListItem className={classes.button}>
-                        <IconButton aria-label="Redo">
+                        <IconButton aria-label="Redo" onClick={handleRedo}>
                             <RedoIcon />
                         </IconButton>
                     </ListItem>
