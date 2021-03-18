@@ -12,6 +12,8 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 * express vlatest
 * socket.io v3.0.4
 * mongodb v3.6.3
+* material-ui ~
+* material-ui-color ~
 
 
 ## Getting started

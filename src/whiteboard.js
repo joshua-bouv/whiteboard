@@ -10,6 +10,8 @@ import ListItem from '@material-ui/core/ListItem';
 import IconButton from '@material-ui/core/IconButton';
 import Popover from '@material-ui/core/Popover';
 
+import {ColorButton} from 'material-ui-color';
+
 import CreateIcon from '@material-ui/icons/Create';
 import PaletteIcon from '@material-ui/icons/Palette';
 import AspectRatioIcon from '@material-ui/icons/AspectRatio';
@@ -19,6 +21,8 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import GestureIcon from '@material-ui/icons/Gesture';
 import CheckBoxOutlineBlankIcon from '@material-ui/icons/CheckBoxOutlineBlank';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
+import TitleIcon from '@material-ui/icons/Title';
+import TouchAppIcon from '@material-ui/icons/TouchApp';
 
 import './styles/board.css';
 import io from "socket.io-client";
@@ -174,7 +178,7 @@ const Board = () => {
             } else if (tools.current.tool === "circle") {
                 holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
             } else if (tools.current.tool === "text") {
-                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], text:textRef.current.value, stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], text: "test", stroke:tools.current.stroke };
             }
 
             generateIncompleteObjects()
@@ -184,7 +188,7 @@ const Board = () => {
                     point: pos,
                     tool:tools.current.tool,
                     stroke:tools.current.stroke,
-                    text: textRef.current.value
+                    text: "test"
                 });
             } else {
                 current.emit('objectStart', {
@@ -288,7 +292,7 @@ const Board = () => {
         completedObjects = []
         setIncompleteObjects([])
         setCompletedObjects([])
-        outer.current.getStage().clear();
+        //outer.current.getStage().clear();
     }
 
     const undoWhiteboard = () => {
@@ -361,17 +365,30 @@ const Board = () => {
     }
 
     const [anchorEl, setAnchorEl] = React.useState(null);
+    const [anchorEl2, setAnchorEl2] = React.useState(null);
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
+    };
+
+
+    const handleClick2 = (event) => {
+        setAnchorEl2(event.currentTarget);
     };
 
     const handleClose = () => {
         setAnchorEl(null);
     };
 
+    const handleClose2 = () => {
+        setAnchorEl2(null);
+    };
+
     const open = Boolean(anchorEl);
     const id = open ? 'simple-popover' : undefined;
+
+    const open2 = Boolean(anchorEl2);
+    const id2 = open2 ? 'simple-popover' : undefined;
 
     return (
         <div>
@@ -388,53 +405,6 @@ const Board = () => {
                     ref={outer}
                     listening={true}
                 >
-                    {
-                        incompleteObjects.map((object, i) => {
-                            if (object.tool === "line" || object.tool === "eraser") {
-                                return (
-                                    <Line
-                                        key={i}
-                                        points={object.points}
-                                        stroke={object.stroke}
-                                        strokeWidth={5}
-                                        tension={0.5}
-                                        lineCap="round"
-                                        globalCompositeOperation={
-                                            object.tool === 'eraser' ? 'destination-out' : 'source-over'
-                                        }
-                                        draggable={false}
-                                        listening={false}
-                                    />
-                                )
-                            } else if (object.tool === "square") {
-                                return (
-                                    <Rect
-                                        key={i}
-                                        x={object.points[0]}
-                                        y={object.points[1]}
-                                        width={object.size[0]}
-                                        height={object.size[1]}
-                                        fill={object.stroke}
-                                        draggable={false}
-                                        listening={false}
-                                    />
-                                )
-                            } else if (object.tool === "circle") {
-                                return (
-                                    <Circle
-                                        key={i}
-                                        x={object.points[0]}
-                                        y={object.points[1]}
-                                        radius={object.radius}
-                                        fill={object.stroke}
-                                        draggable={false}
-                                        listening={false}
-                                    />
-                                )
-                            }
-                        })
-                    }
-                    {console.log(completedObjects)}
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -515,6 +485,54 @@ const Board = () => {
                             }
                         })
                     }
+                    {console.log(completedObjects)}
+                    {
+                        incompleteObjects.map((object, i) => {
+                            if (object.tool === "line" || object.tool === "eraser") {
+                                console.log("bruh")
+                                return (
+                                    <Line
+                                        key={i}
+                                        points={object.points}
+                                        stroke={object.stroke}
+                                        strokeWidth={5}
+                                        tension={0.5}
+                                        lineCap="round"
+                                        globalCompositeOperation={
+                                            object.tool === 'eraser' ? 'destination-out' : 'source-over'
+                                        }
+                                        draggable={false}
+                                        listening={false}
+                                    />
+                                )
+                            } else if (object.tool === "square") {
+                                return (
+                                    <Rect
+                                        key={i}
+                                        x={object.points[0]}
+                                        y={object.points[1]}
+                                        width={object.size[0]}
+                                        height={object.size[1]}
+                                        fill={object.stroke}
+                                        draggable={false}
+                                        listening={false}
+                                    />
+                                )
+                            } else if (object.tool === "circle") {
+                                return (
+                                    <Circle
+                                        key={i}
+                                        x={object.points[0]}
+                                        y={object.points[1]}
+                                        radius={object.radius}
+                                        fill={object.stroke}
+                                        draggable={false}
+                                        listening={false}
+                                    />
+                                )
+                            }
+                        })
+                    }
                 </Layer>
             </Stage>
             <Container className={classes.root} maxWidth="sm">
@@ -543,6 +561,50 @@ const Board = () => {
                     <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "circle"}}>
                         <RadioButtonUncheckedIcon />
                     </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "eraser"}}>
+                        <TouchAppIcon />
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "text"}}>
+                        <TitleIcon />
+                    </IconButton>
+                </Popover>
+                <Popover
+                    id={id2}
+                    open={open2}
+                    anchorEl={anchorEl2}
+                    onClose={handleClose2}
+                    anchorReference="anchorPosition"
+                    anchorPosition={{ top: 60, left: 70 }}
+                    anchorOrigin={{
+                        vertical: 'top',
+                        horizontal: 'left',
+                    }}
+                    transformOrigin={{
+                        vertical: 'top',
+                        horizontal: 'left',
+                    }}
+                >
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "black"}}>
+                        <ColorButton color={strokes['black']}/>
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "red"}}>
+                        <ColorButton color={strokes['red']}/>
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "green"}}>
+                        <ColorButton color={strokes['green']}/>
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "blue"}}>
+                        <ColorButton color={strokes['blue']}/>
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "purple"}}>
+                        <ColorButton color={strokes['purple']}/>
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "grey"}}>
+                        <ColorButton color={strokes['grey']}/>
+                    </IconButton>
+                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2();tools.current.stroke = "yellow"}}>
+                        <ColorButton color={strokes['yellow']}/>
+                    </IconButton>
                 </Popover>
                 <List component="nav">
                     <ListItem className={classes.button}>
@@ -551,7 +613,7 @@ const Board = () => {
                         </IconButton>
                     </ListItem>
                     <ListItem className={classes.button}>
-                        <IconButton aria-label="Colours">
+                        <IconButton aria-label="Colours" aria-controls="simple-menu" aria-haspopup="true" onClick={handleClick2}>
                             <PaletteIcon />
                         </IconButton>
                     </ListItem>
