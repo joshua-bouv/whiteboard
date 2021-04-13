@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Rect, Circle, Text } from 'react-konva';
+import { useAuth0 } from "@auth0/auth0-react";
+
 import BoardRectangle from './Components/BoardRectangle'
 import BoardCircle from './Components/BoardCircle'
 import { makeStyles } from '@material-ui/core/styles';
@@ -157,8 +159,6 @@ const Board = () => {
     const handleMouseDown = (e) => {
         if (isDragging) {
             const clickedOnEmpty = e.target === e.target.getStage();
-            console.log("---")
-            console.log(clickedOnEmpty)
             if (clickedOnEmpty) {
                 selectShape(null);
             }
@@ -303,8 +303,6 @@ const Board = () => {
     }
 
     const redoWhiteboard = () => {
-        console.log(historyCount.current)
-        console.log(...[historicSnapshots.current])
         if (historyCount.current <= historicSnapshots.current.length - 1) {
             setCompletedObjects([...historicSnapshots.current[historyCount.current]])
             historyCount.current += 1
@@ -389,6 +387,7 @@ const Board = () => {
 
     const open2 = Boolean(anchorEl2);
     const id2 = open2 ? 'simple-popover' : undefined;
+    const { loginWithRedirect } = useAuth0();
 
     return (
         <div>
@@ -489,7 +488,6 @@ const Board = () => {
                     {
                         incompleteObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
-                                console.log("bruh")
                                 return (
                                     <Line
                                         key={i}
@@ -635,6 +633,11 @@ const Board = () => {
                     <ListItem className={classes.button}>
                         <IconButton aria-label="Clear" onClick={handleClear}>
                             <DeleteIcon />
+                        </IconButton>
+                    </ListItem>
+                    <ListItem className={classes.button}>
+                        <IconButton aria-label="Clear" onClick={handleJoin}>
+                            <button onClick={() => loginWithRedirect()}>Log In</button>
                         </IconButton>
                     </ListItem>
                 </List>

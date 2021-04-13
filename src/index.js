@@ -3,9 +3,16 @@ import ReactDOM from 'react-dom';
 import './styles/index.css';
 import Board from './whiteboard.js';
 import * as serviceWorker from './serviceWorker';
+import { Auth0Provider } from "@auth0/auth0-react";
 
 ReactDOM.render(
-    <Board />,
+    <Auth0Provider
+        domain="dev-gkui05mm.eu.auth0.com"
+        clientId="ZJlgxQVs4mdzQY4yRXcvi1lNhT7dpBXZ"
+        redirectUri={window.location.origin}
+    >
+        <Board />
+    </Auth0Provider>,
     document.getElementById('root')
 );
 

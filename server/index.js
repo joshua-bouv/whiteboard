@@ -71,25 +71,58 @@ async function main(){
         }
 
         io.on('connection', socket => {
-            function addPlayer(room) {
+            function addUser(room) {
                 socket.leaveAll();
                 socket.join(room);
                 console.log("User connected to room "+room)
             }
 
+            function makeNewWhiteboard() {
+                let newWhiteboard = makeID(9);
+                let searchForUniqueID = true;
+                while (searchForUniqueID) {
+                    let alreadyExists = false;
+                    whiteboards.listCollections({name: newWhiteboard})
+                        .next(function (err, colExists) {
+                            if (colExists) {
+                                alreadyExists = true
+                            }
+                        });
+
+                    if (alreadyExists) {
+                        newWhiteboard = makeID(9);
+                    } else {
+                        searchForUniqueID = false
+                    }
+                }
+
+                whiteboards.createCollection(newWhiteboard);
+                addUser(newWhiteboard)
+                // give user permission to access whiteboard if required
+
+                return newWhiteboard
+            }
+
+            // To request a unique whiteboard
+            socket.on('requestRoom', () => {
+
+            });
+
+
+            // To request a unique whiteboard
+            socket.on('requestRoom', () => {
+                let newWhiteboard = makeNewWhiteboard()
+            });
+
             // To join a whiteboard
             socket.on('joinRoom', (room) => {
-                addPlayer(room)
+                addUser(room)
                 sendWhiteboardToClient(room, socket)
             });
 
             // To create whiteboard
-            socket.on('createRoom', () => {
-                let newWhiteboard = makeID(9);
-                // check to make sure ID doesn't already exist
-                whiteboards.createCollection(newWhiteboard);
-                addPlayer(newWhiteboard)
-                // give user permission to access whiteboard if required
+            socket.on('newRoom', () => {
+                let newWhiteboard = makeNewWhiteboard()
             });
 
             // To start the drawing of a new object
