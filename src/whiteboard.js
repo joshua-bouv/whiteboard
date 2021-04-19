@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Rect, Circle, Text } from 'react-konva';
-import { useAuth0 } from "@auth0/auth0-react";
 
 import BoardRectangle from './Components/BoardRectangle'
 import BoardCircle from './Components/BoardCircle'
@@ -8,7 +7,6 @@ import { makeStyles } from '@material-ui/core/styles';
 
 import Container from '@material-ui/core/Container';
 import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
 import IconButton from '@material-ui/core/IconButton';
 import Popover from '@material-ui/core/Popover';
 
@@ -26,20 +24,34 @@ import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import TitleIcon from '@material-ui/icons/Title';
 import TouchAppIcon from '@material-ui/icons/TouchApp';
 
+import SidebarItem from './UI/SidebarItem'
+
 import './styles/board.css';
 import io from "socket.io-client";
+import SideBarSubItem from "./UI/SideBarSubItem";
+import {Button} from "@material-ui/core";
+import LoginButton from "./UI/Login";
+import UserActions from "./UI/UserActions";
 
 let current = io.connect(':8080/');
 current.emit('joinRoom', "123");
 
-const useStyles = makeStyles({
+const useStyles = makeStyles((theme) => ({
     root: {
         position: 'absolute',
         top: 0,
         left: 0,
-        maxWidth: 130,
+        width: 63,
         paddingLeft: 10,
         paddingRight: 5,
+    },
+    login: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        width: 'auto',
+        paddingLeft: 0,
+        paddingRight: 0,
     },
     button: {
         paddingTop: 2,
@@ -47,7 +59,10 @@ const useStyles = makeStyles({
         paddingLeft: 0,
         paddingRight: 0,
     },
-});
+    adminButton: {
+        marginRight: 10,
+    },
+}));
 
 const Board = () => {
     const tools = useRef({
@@ -57,6 +72,7 @@ const Board = () => {
 
     let [incompleteObjects, setIncompleteObjects] = useState([]);
     let [completedObjects, setCompletedObjects] = useState([]);
+    const [value, setValue] = useState(0); // for forcing refreshes
     const holdingObjects = useRef([]);
     let historicSnapshots = useRef([]);
     let historyCount = useRef(0);
@@ -64,13 +80,11 @@ const Board = () => {
     const outer = useRef(null);
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
-    const textRef = useRef(null);
     const classes = useStyles();
 
     let [isDragging, setIsDragging] = useState(false);
     let [isDrawingTool, setIsDrawingTool] = useState(false);
 
-    const strokeButtons = [];
     const strokes = {
         'black': '#000000',
         'red': '#e74c3c',
@@ -81,18 +95,6 @@ const Board = () => {
         'yellow': '#f1c40f',
     };
 
-    for (const key in strokes) { // to generate the pre-defined colors
-        strokeButtons.push(
-            <div
-                key={key}
-                value={tools.current.stroke}
-                onClick={() => {
-                    tools.current.stroke = strokes[key];
-                }}
-                className={"color "+key}
-            />)
-    }
-
     useEffect(() => {
         current.on('objectStart', handleSocketDown);
         current.on('drawing', handleSocketMove);
@@ -102,6 +104,7 @@ const Board = () => {
         current.on('clearWhiteboard', clearWhiteboard);
         current.on('undoWhiteboard', undoWhiteboard);
         current.on('redoWhiteboard', redoWhiteboard);
+        current.on('loggedIn', loggedIn);
 
         return () => {
             current.off();
@@ -329,6 +332,25 @@ const Board = () => {
         clearWhiteboard()
         room = roomIDRef.current.value
         current.emit('joinRoom', room);
+        {window.history.replaceState(null, "New Page Title", "/"+room.current)}
+    }
+
+    const handleLogin = (form) => {
+        let data = {
+            'user': form.username,
+            'password': form.password
+        }
+
+        current.emit('login', data)
+    }
+
+    const handleSignup = (form) => {
+        let data = {
+            'user': form.username,
+            'password': form.password
+        }
+
+        current.emit('signup', data)
     }
 
     const handleMoveObjects = () => {
@@ -387,7 +409,24 @@ const Board = () => {
 
     const open2 = Boolean(anchorEl2);
     const id2 = open2 ? 'simple-popover' : undefined;
-    const { loginWithRedirect } = useAuth0();
+
+    window.history.replaceState(null, "New Page Title", "/"+room.current)
+
+    const loggedIn = (data) => {
+        console.log(data)
+        localStorage.setItem('session', data)
+        setValue(value => value + 1);
+        console.log(localStorage.getItem('session'))
+    }
+
+    function ActionBar() {
+        console.log(localStorage.getItem('session'))
+        if (localStorage.getItem('session')) {
+            return <UserActions class={classes.adminButton} />;
+        } else {
+            return <LoginButton class={classes.adminButton} login={handleLogin} signup={handleSignup} />;
+        }
+    }
 
     return (
         <div>
@@ -484,7 +523,6 @@ const Board = () => {
                             }
                         })
                     }
-                    {console.log(completedObjects)}
                     {
                         incompleteObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -603,76 +641,25 @@ const Board = () => {
                     <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2();tools.current.stroke = "yellow"}}>
                         <ColorButton color={strokes['yellow']}/>
                     </IconButton>
+                    {/*<SideBarSubItem function={handleClose2} stroke={tools.current.stroke} hex={strokes['yellow']}/>*/}
                 </Popover>
                 <List component="nav">
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={handleClick}>
-                            <CreateIcon />
-                        </IconButton>
-                    </ListItem>
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Colours" aria-controls="simple-menu" aria-haspopup="true" onClick={handleClick2}>
-                            <PaletteIcon />
-                        </IconButton>
-                    </ListItem>
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Manipulate" onClick={handleMoveObjects}>
-                            <AspectRatioIcon />
-                        </IconButton>
-                    </ListItem>
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Undo" onClick={handleUndo}>
-                            <UndoIcon />
-                        </IconButton>
-                    </ListItem>
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Redo" onClick={handleRedo}>
-                            <RedoIcon />
-                        </IconButton>
-                    </ListItem>
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Clear" onClick={handleClear}>
-                            <DeleteIcon />
-                        </IconButton>
-                    </ListItem>
-                    <ListItem className={classes.button}>
-                        <IconButton aria-label="Clear" onClick={handleJoin}>
-                            <button onClick={() => loginWithRedirect()}>Log In</button>
-                        </IconButton>
-                    </ListItem>
+                    <SidebarItem icon=<CreateIcon /> function={handleClick} class={classes.button}/>
+                    <SidebarItem icon=<PaletteIcon /> function={handleClick2} class={classes.button}/>
+                    <SidebarItem icon=<AspectRatioIcon /> function={handleMoveObjects} class={classes.button}/>
+                    <SidebarItem icon=<UndoIcon /> function={handleUndo} class={classes.button}/>
+                    <SidebarItem icon=<RedoIcon /> function={handleRedo} class={classes.button}/>
+                    <SidebarItem icon=<DeleteIcon /> function={handleClear} class={classes.button}/>
                 </List>
+            </Container>
+            <Container className={classes.login} maxWidth="auto">
+                <ActionBar />
+                <Button>
+                    Join whiteboard
+                </Button>
             </Container>
         </div>
     );
 };
 
 export default Board
-/*
-<select
-className="select"
-value={tools.current.tool}
-onChange={(e) => {
-    tools.current.tool = e.target.value;
-}}
->
-<option value="line">Line</option>
-<option value="eraser">Eraser</option>
-<option value="square">Square</option>
-<option value="circle">Circle</option>
-<option value="text">Text</option>
-</select>
-<div className="colors">
-{strokeButtons}
-</div>
-<div className="buttons">
-<textarea ref={textRef} defaultValue='example text'/>
-<button className="button tools" onClick={handleClear}><FontAwesomeIcon icon={faTrash} /></button>
-<textarea ref={roomIDRef} defaultValue={room.current}/>
-<button className="button toolsL" onClick={handleJoin}>Join room</button>
-<button className="button tools" onClick={handleUndo}><FontAwesomeIcon icon={faUndo} /></button>
-<button className="button tools" onClick={handleRedo}><FontAwesomeIcon icon={faRedo} /></button>
-<button className="button tools" onClick={handleStartDrawing}><FontAwesomeIcon icon={faPen} /></button>
-<button className="button tools" onClick={handleMoveObjects}><FontAwesomeIcon icon={faArrowsAlt} /></button>
-<button className="button tools" onClick={handleResizeObjects}><FontAwesomeIcon icon={faExpand} /></button>
-</div>
-*/

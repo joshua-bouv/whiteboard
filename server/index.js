@@ -13,6 +13,8 @@ async function main(){
     try {
         await client.connect();
         const whiteboards = client.db("whiteboards");
+        const users = client.db("users");
+        const permissions = client.db("permissions");
 
         // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
         function makeID(length) {
@@ -70,6 +72,41 @@ async function main(){
             }
         }
 
+        async function login(data, callback) {
+            try {
+                await users.collection("users").findOne({user: data.user}).then(results => {
+                    console.log("reult:")
+                    console.log(results)
+                    if (results) {
+                        return callback(results['_id'])
+                    }
+                    return callback(false)
+                })
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        async function register(data) {
+            try {
+                let uniqueUser = true
+                await users.collection("users").findOne({user: data.user}).then(results => {
+                    console.log("Searching for user")
+                    if (results) {
+                        console.log("User not unique")
+                        uniqueUser = false
+                    }
+                })
+
+                if (uniqueUser) {
+                    console.log("Unique user, creating")
+                    await users.collection("users").insertOne(data);
+                }
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
         io.on('connection', socket => {
             function addUser(room) {
                 socket.leaveAll();
@@ -98,10 +135,32 @@ async function main(){
 
                 whiteboards.createCollection(newWhiteboard);
                 addUser(newWhiteboard)
-                // give user permission to access whiteboard if required
+                permissions.collection("permissions").insertOne({name: newWhiteboard, permission: 'write', owner: '', writers: {}});
 
                 return newWhiteboard
             }
+
+            // To login to website
+            socket.on('login', (data) => {
+                // escape stuff
+                console.log(data)
+                login(data, function(isLoggedIn) {
+                    console.log(isLoggedIn)
+                    if (isLoggedIn) {
+                        console.log("Logging in")
+                        socket.emit('loggedIn', isLoggedIn)
+                    } else {
+                        console.log("User not found / wrong password")
+                        // wrong password / doesn't exist
+                    }
+                })
+            });
+
+            // To signup to website
+            socket.on('signup', (data) => {
+                console.log(data)
+                register(data)
+            });
 
             // To request a unique whiteboard
             socket.on('requestRoom', () => {

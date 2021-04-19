@@ -1,15 +1,14 @@
 import React from 'react';
-import ListItem from "@material-ui/core/ListItem";
 import IconButton from "@material-ui/core/IconButton";
+import {ColorButton} from "material-ui-color";
 
-function sidebarItem(props) {
+function SideBarSubItem(props) {
     return (
-        <ListItem className={props.class}>
-            <IconButton aria-label="Clear" onClick={props.function}>
-                {props.icon}
-            </IconButton>
-        </ListItem>
+        <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {props.function(); props.stroke = "yellow"}}>
+            {console.log(props.hex)}
+            <ColorButton color={props.hex}/>
+        </IconButton>
     )
 }
 
-export default sidebarItem;
+export default SideBarSubItem;
