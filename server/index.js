@@ -14,7 +14,6 @@ async function main(){
         await client.connect();
         const whiteboards = client.db("whiteboards");
         const users = client.db("users");
-        const permissions = client.db("permissions");
 
         // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
         function makeID(length) {
@@ -31,11 +30,9 @@ async function main(){
             try {
                 whiteboards.collection(board).find({}).forEach(function(doc) {
                     socket.emit('streamObject', doc)
-                }, function(err) {
-                    console.log(err)
-                });
+                }, function(err) {});  // finished finding objects
             } catch (e) {
-                console.log("Error here")
+                console.log("Error sending whiteboard to client")
                 console.error(e)
             }
         }
@@ -44,6 +41,7 @@ async function main(){
             try {
                 await whiteboards.collection(board).insertOne(data);
             } catch (e) {
+                console.log("Error sending object to client")
                 console.error(e)
             }
         }
@@ -52,6 +50,7 @@ async function main(){
             try {
                 await whiteboards.collection(board).findOneAndUpdate({_id:data._id}, {$set: {}})
             } catch (e) {
+                console.log("Error updating object to client")
                 console.error(e)
             }
         }
@@ -60,6 +59,7 @@ async function main(){
             try {
                 await whiteboards.collection(board).deleteMany({});
             } catch (e) {
+                console.log("Error clearing whiteboard")
                 console.error(e)
             }
         }
@@ -68,6 +68,7 @@ async function main(){
             try {
                 await whiteboards.collection(board).findOneAndDelete({}, {sort: {_id: -1}})
             } catch (e) {
+                console.log("Error undoing whiteboard")
                 console.error(e)
             }
         }
@@ -75,14 +76,13 @@ async function main(){
         async function login(data, callback) {
             try {
                 await users.collection("users").findOne({user: data.user}).then(results => {
-                    console.log("reult:")
-                    console.log(results)
                     if (results) {
                         return callback(results['_id'])
                     }
                     return callback(false)
                 })
             } catch (e) {
+                console.log("Error logging in")
                 console.error(e)
             }
         }
@@ -91,18 +91,48 @@ async function main(){
             try {
                 let uniqueUser = true
                 await users.collection("users").findOne({user: data.user}).then(results => {
-                    console.log("Searching for user")
                     if (results) {
-                        console.log("User not unique")
                         uniqueUser = false
                     }
                 })
 
                 if (uniqueUser) {
-                    console.log("Unique user, creating")
                     await users.collection("users").insertOne(data);
                 }
             } catch (e) {
+                console.log("Error registering user")
+                console.error(e)
+            }
+        }
+
+        async function getWhiteboards(userID) {
+            try {
+                let whiteboards = []
+                await users.collection("permissions").find({owner: userID}).forEach(function(doc) {
+                    whiteboards.push(doc)
+                }, function(err) {});  // finished finding whiteboards
+
+                return whiteboards
+            } catch (e) {
+                console.log("Error registering user")
+                console.error(e)
+            }
+        }
+
+        async function changeGlobalPermission(data) {
+            try {
+                let userIsOwner = false
+                await users.collection("permissions").findOne({owner: data.user}).then(results => {
+                    if (results) {
+                        userIsOwner = true
+                    }
+                })
+
+                if (userIsOwner) {
+                    await users.collection("permissions").findOneAndUpdate({name: data.room}, {$set: {permission: data.newPermission}})
+                }
+            } catch (e) {
+                console.log("Error changing permission")
                 console.error(e)
             }
         }
@@ -114,7 +144,7 @@ async function main(){
                 console.log("User connected to room "+room)
             }
 
-            function makeNewWhiteboard() {
+            function makeNewWhiteboard(userID) {
                 let newWhiteboard = makeID(9);
                 let searchForUniqueID = true;
                 while (searchForUniqueID) {
@@ -135,7 +165,7 @@ async function main(){
 
                 whiteboards.createCollection(newWhiteboard);
                 addUser(newWhiteboard)
-                permissions.collection("permissions").insertOne({name: newWhiteboard, permission: 'write', owner: '', writers: {}});
+                users.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: {}});
 
                 return newWhiteboard
             }
@@ -143,11 +173,8 @@ async function main(){
             // To login to website
             socket.on('login', (data) => {
                 // escape stuff
-                console.log(data)
                 login(data, function(isLoggedIn) {
-                    console.log(isLoggedIn)
                     if (isLoggedIn) {
-                        console.log("Logging in")
                         socket.emit('loggedIn', isLoggedIn)
                     } else {
                         console.log("User not found / wrong password")
@@ -158,42 +185,33 @@ async function main(){
 
             // To signup to website
             socket.on('signup', (data) => {
-                console.log(data)
                 register(data)
             });
 
             // To request a unique whiteboard
-            socket.on('requestRoom', () => {
-
-            });
-
-
-            // To request a unique whiteboard
-            socket.on('requestRoom', () => {
-                let newWhiteboard = makeNewWhiteboard()
+            socket.on('requestRoom', (data) => {
+                let newWhiteboard = makeNewWhiteboard(data)
+                addUser(newWhiteboard)
+                socket.emit('setupWhiteboard', newWhiteboard)
             });
 
             // To join a whiteboard
             socket.on('joinRoom', (room) => {
                 addUser(room)
                 sendWhiteboardToClient(room, socket)
-            });
-
-            // To create whiteboard
-            socket.on('newRoom', () => {
-                let newWhiteboard = makeNewWhiteboard()
+                socket.emit('setupWhiteboard', room)
             });
 
             // To start the drawing of a new object
             socket.on('objectStart', (data) => {
                 data['user'] = socket.id;
-                socket.to("123").emit('objectStart', data);
+                socket.to(data.room).emit('objectStart', data);
             });
 
             // To draw whiteboard across all clients
             socket.on('drawing', (data) => {
                 data['user'] = socket.id;
-                socket.to("123").broadcast.emit('drawing', data);
+                socket.to(data.room).broadcast.emit('drawing', data);
             });
 
             socket.on('objectEnd', (data) => {
@@ -204,8 +222,8 @@ async function main(){
 
             // To update an object on the whiteboard
             socket.on('updateObject', (data) => {
-                //updateObjectOnBoard("123", data)
-                socket.to("123").broadcast.emit('updateObject', data);
+                //updateObjectOnBoard(data.room, data)
+                socket.to(data.room).broadcast.emit('updateObject', data);
             });
 
             // To clear whiteboard across all clients
@@ -226,10 +244,21 @@ async function main(){
                 addObjectToBoard(data.room, data.object)
                 socket.to(data.room).broadcast.emit('redoWhiteboard');
             });
+
+            // To load a whiteboard
+            socket.on('loadWhiteboards', (userID) => {
+                socket.emit('loadWhiteboards', getWhiteboards(userID));
+            });
+
+            // To change the global permissions of a whiteboard
+            socket.on('changeGlobalPermission', (data) => {
+                changeGlobalPermission(data)
+            })
         });
 
         http.listen(8080,() => console.log(`Whiteboard server active`));
     } catch (e) {
+        console.log("General error")
         console.error(e);
     }
 }

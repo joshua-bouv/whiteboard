@@ -3,35 +3,34 @@ import FormControl from "@material-ui/core/FormControl";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
 import FormHelperText from "@material-ui/core/FormHelperText";
-import IconButton from "@material-ui/core/IconButton";
-import PublishIcon from "@material-ui/icons/Publish";
+import {Button} from "@material-ui/core";
 
 function UserActions(props) {
-    const [age, setAge] = React.useState('');
+    const [permissions, setPermissions] = React.useState('read');
 
     const handleChange = (event) => {
-        setAge(event.target.value);
+        setPermissions(event.target.value)
+        props.changePermissions(event.target.value)
     };
 
-
     return (
-        <div className={props.class} style={{display: 'inline-flex'}}>
+        <div className={props.class}>
             <FormControl className={props.class} >
                 <Select
-                    value={age}
+                    value={permissions}
                     onChange={handleChange}
                     displayEmpty
                 >
-                    <MenuItem value="">
+                    <MenuItem value="read">
                         <em>Read-only</em>
                     </MenuItem>
                     <MenuItem value="write">Write</MenuItem>
                 </Select>
                 <FormHelperText>For viewers</FormHelperText>
             </FormControl>
-            <IconButton>
-                <PublishIcon />
-            </IconButton>
+            <Button onClick={props.loadWhiteboards}>
+                Load Whiteboard
+            </Button>
         </div>
     )
 }

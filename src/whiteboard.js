@@ -32,9 +32,21 @@ import SideBarSubItem from "./UI/SideBarSubItem";
 import {Button} from "@material-ui/core";
 import LoginButton from "./UI/Login";
 import UserActions from "./UI/UserActions";
+import JoinButton from "./UI/JoinWhiteboard";
 
 let current = io.connect(':8080/');
-current.emit('joinRoom', "123");
+let sessionRoom = sessionStorage.getItem('session')
+let urlRoom = window.location.pathname.substring(1)
+if (sessionRoom) {
+    console.log("joining room from session")
+    current.emit('joinRoom', sessionRoom)
+} else if (urlRoom !== "") {
+    console.log("joining room from url")
+    current.emit('joinRoom', urlRoom)
+} else {
+    console.log("making new room")
+    current.emit('requestRoom', localStorage.getItem('session'))
+}
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -76,7 +88,7 @@ const Board = () => {
     const holdingObjects = useRef([]);
     let historicSnapshots = useRef([]);
     let historyCount = useRef(0);
-    let room = useRef("123");
+    let room = useRef("");
     const outer = useRef(null);
     const isDrawing = useRef(false);
     const roomIDRef = useRef(null);
@@ -105,11 +117,18 @@ const Board = () => {
         current.on('undoWhiteboard', undoWhiteboard);
         current.on('redoWhiteboard', redoWhiteboard);
         current.on('loggedIn', loggedIn);
+        current.on('setupWhiteboard', setupWhiteboard);
 
         return () => {
             current.off();
         }
     });
+
+    const setupWhiteboard = (data) => {
+        room.current = data
+        sessionStorage.setItem('session', data)
+        window.history.replaceState(null, "New Page Title", "/"+room.current)
+    }
 
     const generateIncompleteObjects = () => {
         incompleteObjects = []
@@ -189,15 +208,17 @@ const Board = () => {
             if (tools.current.tool === "text") {
                 current.emit('objectStart', {
                     point: pos,
-                    tool:tools.current.tool,
-                    stroke:tools.current.stroke,
-                    text: "test"
+                    tool: tools.current.tool,
+                    stroke: tools.current.stroke,
+                    text: "test",
+                    room: room.current
                 });
             } else {
                 current.emit('objectStart', {
                     point: pos,
-                    tool:tools.current.tool,
-                    stroke:tools.current.stroke,
+                    tool: tools.current.tool,
+                    stroke: tools.current.stroke,
+                    room: room.current
                 });
             }
         }
@@ -231,6 +252,7 @@ const Board = () => {
 
         current.emit('drawing', {
             point,
+            room: room.current
         });
     };
 
@@ -328,11 +350,9 @@ const Board = () => {
         current.emit('redoWhiteboard', {room:room.current, object: latestLine[latestLine.length-1]});
     }
 
-    const handleJoin = () => {
+    const handleJoin = (newRoom) => {
         clearWhiteboard()
-        room = roomIDRef.current.value
-        current.emit('joinRoom', room);
-        {window.history.replaceState(null, "New Page Title", "/"+room.current)}
+        current.emit('joinRoom', newRoom.whiteboardID);
     }
 
     const handleLogin = (form) => {
@@ -384,6 +404,10 @@ const Board = () => {
         stage.batchDraw();
     }
 
+    const handleChangePermissions = (newPermission) => {
+        current.emit('changeGlobalPermission', {room: room.current, user: localStorage.getItem('session'), newPermission: newPermission})
+    }
+
     const [anchorEl, setAnchorEl] = React.useState(null);
     const [anchorEl2, setAnchorEl2] = React.useState(null);
 
@@ -410,22 +434,21 @@ const Board = () => {
     const open2 = Boolean(anchorEl2);
     const id2 = open2 ? 'simple-popover' : undefined;
 
-    window.history.replaceState(null, "New Page Title", "/"+room.current)
-
     const loggedIn = (data) => {
-        console.log(data)
         localStorage.setItem('session', data)
         setValue(value => value + 1);
-        console.log(localStorage.getItem('session'))
     }
 
     function ActionBar() {
-        console.log(localStorage.getItem('session'))
         if (localStorage.getItem('session')) {
-            return <UserActions class={classes.adminButton} />;
+            return <UserActions class={classes.adminButton} changePermissions={handleChangePermissions} loadWhiteboards={handleLoadWhiteboards} />;
         } else {
             return <LoginButton class={classes.adminButton} login={handleLogin} signup={handleSignup} />;
         }
+    }
+
+    const handleLoadWhiteboards = () => {
+        current.emit('loadWhiteboards', localStorage.getItem('session'))
     }
 
     return (
@@ -652,11 +675,11 @@ const Board = () => {
                     <SidebarItem icon=<DeleteIcon /> function={handleClear} class={classes.button}/>
                 </List>
             </Container>
-            <Container className={classes.login} maxWidth="auto">
+            <Container className={classes.login} style={{display: 'inline-flex'}} maxWidth={false}>
                 <ActionBar />
-                <Button>
-                    Join whiteboard
-                </Button>
+                <div>
+                    <JoinButton class={classes.adminButton} join={handleJoin} />
+                </div>
             </Container>
         </div>
     );
