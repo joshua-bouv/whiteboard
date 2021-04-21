@@ -23,13 +23,13 @@ import CheckBoxOutlineBlankIcon from '@material-ui/icons/CheckBoxOutlineBlank';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import TitleIcon from '@material-ui/icons/Title';
 import TouchAppIcon from '@material-ui/icons/TouchApp';
+import { useSnackbar } from 'notistack';
 
 import SidebarItem from './UI/SidebarItem'
 
 import './styles/board.css';
 import io from "socket.io-client";
 import SideBarSubItem from "./UI/SideBarSubItem";
-import {Button} from "@material-ui/core";
 import LoginButton from "./UI/Login";
 import UserActions from "./UI/UserActions";
 import JoinButton from "./UI/JoinWhiteboard";
@@ -91,8 +91,8 @@ const Board = () => {
     let room = useRef("");
     const outer = useRef(null);
     const isDrawing = useRef(false);
-    const roomIDRef = useRef(null);
     const classes = useStyles();
+    const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
     let [isDragging, setIsDragging] = useState(false);
     let [isDrawingTool, setIsDrawingTool] = useState(false);
@@ -118,11 +118,17 @@ const Board = () => {
         current.on('redoWhiteboard', redoWhiteboard);
         current.on('loggedIn', loggedIn);
         current.on('setupWhiteboard', setupWhiteboard);
+        current.on('displayNotification', displayNotification);
 
         return () => {
             current.off();
         }
     });
+
+    const displayNotification = (text) => {
+        console.log("rip")
+        enqueueSnackbar(text);
+    }
 
     const setupWhiteboard = (data) => {
         room.current = data
@@ -336,6 +342,7 @@ const Board = () => {
 
     const handleClear = () => {
         clearWhiteboard()
+        enqueueSnackbar("Whiteboard cleared");
         current.emit('clearWhiteboard', room.current);
     }
 

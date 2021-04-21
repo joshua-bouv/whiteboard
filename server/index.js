@@ -176,9 +176,11 @@ async function main(){
                 login(data, function(isLoggedIn) {
                     if (isLoggedIn) {
                         socket.emit('loggedIn', isLoggedIn)
+                        socket.emit('displayNotification', "Hi "+data.user)
+                        console.log("Logging in user "+data.user)
                     } else {
+                        socket.emit('displayNotification', "Incorrect username/password")
                         console.log("User not found / wrong password")
-                        // wrong password / doesn't exist
                     }
                 })
             });
@@ -200,6 +202,7 @@ async function main(){
                 addUser(room)
                 sendWhiteboardToClient(room, socket)
                 socket.emit('setupWhiteboard', room)
+                socket.emit('displayNotification', "Joined whiteboard "+room)
             });
 
             // To start the drawing of a new object
@@ -230,6 +233,7 @@ async function main(){
             socket.on('clearWhiteboard', (room) => {
                 socket.to(room).broadcast.emit('clearWhiteboard');
                 clearBoard(room)
+                socket.to(room).emit('displayNotification', "Whiteboard cleared")
             });
 
             // To undo a change on the whiteboard
@@ -253,6 +257,11 @@ async function main(){
             // To change the global permissions of a whiteboard
             socket.on('changeGlobalPermission', (data) => {
                 changeGlobalPermission(data)
+                let text = "Read-only"
+                if (data.newPermission === "write") {
+                    text = "Write"
+                }
+                socket.emit('displayNotification', "Permissions changed to "+text)
             })
         });
 
