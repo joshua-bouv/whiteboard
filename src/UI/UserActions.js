@@ -1,12 +1,62 @@
-import React from "react";
+import React, {forwardRef, useImperativeHandle, useState} from "react";
+import { makeStyles } from '@material-ui/core/styles';
 import FormControl from "@material-ui/core/FormControl";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
 import FormHelperText from "@material-ui/core/FormHelperText";
 import {Button} from "@material-ui/core";
+import Typography from '@material-ui/core/Typography';
+import Grid from '@material-ui/core/Grid';
+import Card from '@material-ui/core/Card';
+import CardActionArea from '@material-ui/core/CardActionArea';
+import CardActions from '@material-ui/core/CardActions';
+import CardContent from '@material-ui/core/CardContent';
+import CardMedia from '@material-ui/core/CardMedia';
+import Modal from '@material-ui/core/Modal';
 
-function UserActions(props) {
+const useStyles = makeStyles((theme) => ({
+    root: {
+        flexGrow: 1,
+    },
+    card: {
+        minWidth: 242,
+        maxWidth: 242,
+        minHeight: 180,
+        maxHeight: 180,
+    },
+    media: {
+        height: '60px',
+        width: '242px',
+        objectFit: 'none',
+    },
+}));
+
+
+const UserActions = forwardRef((props, ref) => {
+    const classes = useStyles();
     const [permissions, setPermissions] = React.useState('read');
+    const [open, setOpen] = React.useState(false);
+    let [savedWhiteboards, setSavedWhiteboards] = useState([]);
+
+    useImperativeHandle(ref, () => ({
+        updateSavedWhiteboards: (data) => {
+            setSavedWhiteboards(data)
+        }
+    }));
+
+    const handleOpen = () => {
+        props.loadWhiteboards()
+        setOpen(true);
+    };
+
+    const handleClose = () => {
+        setOpen(false);
+    };
+
+    const handleMakeNewClose = () => {
+        setOpen(false);
+        props.makeNewWhiteboard()
+    };
 
     const handleChange = (event) => {
         setPermissions(event.target.value)
@@ -28,11 +78,66 @@ function UserActions(props) {
                 </Select>
                 <FormHelperText>For viewers</FormHelperText>
             </FormControl>
-            <Button onClick={props.loadWhiteboards}>
-                Load Whiteboard
+            <Button onClick={handleOpen}>
+                Load whiteboard
             </Button>
+            <Modal
+                open={open}
+                onClose={handleClose}
+                aria-labelledby="simple-modal-title"
+                aria-describedby="simple-modal-description"
+                style={{'maxWidth': 500, display:'flex', 'justifyContent':'center', 'alignItems':'center', 'margin': 'auto'}}
+            >
+                <Grid container spacing={1}>
+                    <Grid container item xs={12} spacing={1}>
+                        {
+                            savedWhiteboards.map((whiteboard, i) => {
+                                return (
+                                    <Grid item xs={6}>
+                                        <Card className={classes.card}>
+                                            <CardActionArea onClick={() => props.loadWhiteboard({whiteboardID: whiteboard.name})}>
+                                                <CardMedia
+                                                    className={classes.media}
+                                                    component='img'
+                                                    src={whiteboard.snapshot}
+                                                />
+                                                <CardContent>
+                                                    <Typography gutterBottom variant="h5" component="h2">
+                                                        {whiteboard.name}
+                                                    </Typography>
+                                                </CardContent>
+                                            </CardActionArea>
+                                            <CardActions>
+                                                <Button size="small" color="primary" onClick={() => props.loadWhiteboard({whiteboardID: whiteboard.name})}>
+                                                    Load
+                                                </Button>
+                                            </CardActions>
+                                        </Card>
+                                    </Grid>
+                                )
+                            })
+                        }
+                        <Grid item xs={6}>
+                            <Card className={classes.card}>
+                                <CardActionArea onClick={handleMakeNewClose}>
+                                    <CardContent>
+                                        <Typography gutterBottom variant="h5" component="h2">
+                                            New whiteboard
+                                        </Typography>
+                                    </CardContent>
+                                </CardActionArea>
+                                <CardActions style={{'marginTop': '60px'}}>
+                                    <Button size="small" color="primary" onClick={handleMakeNewClose}>
+                                        Create
+                                    </Button>
+                                </CardActions>
+                            </Card>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Modal>
         </div>
     )
-}
+});
 
 export default UserActions;

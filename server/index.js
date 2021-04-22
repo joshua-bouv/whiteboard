@@ -28,7 +28,7 @@ async function main(){
 
         async function sendWhiteboardToClient(board, socket) {
             try {
-                whiteboards.collection(board).find({}).forEach(function(doc) {
+                await whiteboards.collection(board).find({}).forEach(function(doc) {
                     socket.emit('streamObject', doc)
                 }, function(err) {});  // finished finding objects
             } catch (e) {
@@ -105,16 +105,13 @@ async function main(){
             }
         }
 
-        async function getWhiteboards(userID) {
+        async function getWhiteboards(userID, callback) {
             try {
-                let whiteboards = []
-                await users.collection("permissions").find({owner: userID}).forEach(function(doc) {
-                    whiteboards.push(doc)
-                }, function(err) {});  // finished finding whiteboards
-
-                return whiteboards
+                await users.collection("permissions").find({owner: userID}).toArray().then(items => {
+                    return callback(items)
+                })
             } catch (e) {
-                console.log("Error registering user")
+                console.log("Error finding users whiteboards")
                 console.error(e)
             }
         }
@@ -134,6 +131,14 @@ async function main(){
             } catch (e) {
                 console.log("Error changing permission")
                 console.error(e)
+            }
+        }
+
+        async function updateSnapshot(room, image) {
+            try {
+                await users.collection("permissions").findOneAndUpdate({name: room}, {$set: {snapshot: image}})
+            } catch (e) {
+                console.log("Error updating image")
             }
         }
 
@@ -165,7 +170,7 @@ async function main(){
 
                 whiteboards.createCollection(newWhiteboard);
                 addUser(newWhiteboard)
-                users.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: {}});
+                users.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: {}, snapshot: null});
 
                 return newWhiteboard
             }
@@ -220,6 +225,7 @@ async function main(){
             socket.on('objectEnd', (data) => {
                 data.object['user'] = socket.id;
                 addObjectToBoard(data.room, data.object)
+                updateSnapshot(data.room, data.image)
                 socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
             });
 
@@ -251,7 +257,10 @@ async function main(){
 
             // To load a whiteboard
             socket.on('loadWhiteboards', (userID) => {
-                socket.emit('loadWhiteboards', getWhiteboards(userID));
+                getWhiteboards(userID, function(whiteboards) {
+                    console.log(whiteboards)
+                    socket.emit('loadWhiteboards', whiteboards);
+                })
             });
 
             // To change the global permissions of a whiteboard

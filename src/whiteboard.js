@@ -91,8 +91,9 @@ const Board = () => {
     let room = useRef("");
     const outer = useRef(null);
     const isDrawing = useRef(false);
+    const loadWhiteboardsUI = useRef(null);
     const classes = useStyles();
-    const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+    const { enqueueSnackbar } = useSnackbar();
 
     let [isDragging, setIsDragging] = useState(false);
     let [isDrawingTool, setIsDrawingTool] = useState(false);
@@ -119,14 +120,18 @@ const Board = () => {
         current.on('loggedIn', loggedIn);
         current.on('setupWhiteboard', setupWhiteboard);
         current.on('displayNotification', displayNotification);
+        current.on('loadWhiteboards', loadWhiteboards);
 
         return () => {
             current.off();
         }
     });
 
+    const loadWhiteboards = (data) => {
+        loadWhiteboardsUI.current.updateSavedWhiteboards(data)
+    }
+
     const displayNotification = (text) => {
-        console.log("rip")
         enqueueSnackbar(text);
     }
 
@@ -134,6 +139,11 @@ const Board = () => {
         room.current = data
         sessionStorage.setItem('session', data)
         window.history.replaceState(null, "New Page Title", "/"+room.current)
+    }
+
+    const makeNewWhiteboard = () => {
+        clearWhiteboard()
+        current.emit('requestRoom', localStorage.getItem('session'))
     }
 
     const generateIncompleteObjects = () => {
@@ -268,13 +278,14 @@ const Board = () => {
     };
 
     /* For ending objects via the local user */
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
         if (isDrawingTool) {
             isDrawing.current = false;
             let completedObject = holdingObjects.current['self'];
             completedObjects.push(completedObject)
             setCompletedObjects([...completedObjects.concat()])
-            current.emit('objectEnd', {room:room.current, object: completedObject});
+            let stage = e.target.getStage()
+            current.emit('objectEnd', {room:room.current, object: completedObject, image: stage.toDataURL({pixelRatio: 0.1})});
             holdingObjects.current['self'] = [];
         }
         generateIncompleteObjects()
@@ -358,6 +369,7 @@ const Board = () => {
     }
 
     const handleJoin = (newRoom) => {
+        console.log(newRoom)
         clearWhiteboard()
         current.emit('joinRoom', newRoom.whiteboardID);
     }
@@ -422,7 +434,6 @@ const Board = () => {
         setAnchorEl(event.currentTarget);
     };
 
-
     const handleClick2 = (event) => {
         setAnchorEl2(event.currentTarget);
     };
@@ -448,7 +459,7 @@ const Board = () => {
 
     function ActionBar() {
         if (localStorage.getItem('session')) {
-            return <UserActions class={classes.adminButton} changePermissions={handleChangePermissions} loadWhiteboards={handleLoadWhiteboards} />;
+            return <UserActions ref={r => (loadWhiteboardsUI.current = r)} class={classes.adminButton} makeNewWhiteboard={makeNewWhiteboard} changePermissions={handleChangePermissions} loadWhiteboard={handleJoin} loadWhiteboards={handleLoadWhiteboards} />;
         } else {
             return <LoginButton class={classes.adminButton} login={handleLogin} signup={handleSignup} />;
         }
