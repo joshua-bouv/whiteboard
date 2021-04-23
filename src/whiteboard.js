@@ -23,6 +23,8 @@ import CheckBoxOutlineBlankIcon from '@material-ui/icons/CheckBoxOutlineBlank';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import TitleIcon from '@material-ui/icons/Title';
 import TouchAppIcon from '@material-ui/icons/TouchApp';
+import Icon from '@mdi/react'
+import { mdiEraserVariant } from '@mdi/js';
 import { useSnackbar } from 'notistack';
 
 import SidebarItem from './UI/SidebarItem'
@@ -33,6 +35,9 @@ import SideBarSubItem from "./UI/SideBarSubItem";
 import LoginButton from "./UI/Login";
 import UserActions from "./UI/UserActions";
 import JoinButton from "./UI/JoinWhiteboard";
+import BoardText from "./Components/BoardText";
+import {SvgIcon} from "@material-ui/core";
+import Button from "@material-ui/core/Button";
 
 let current = io.connect(':8080/');
 let sessionRoom = sessionStorage.getItem('session')
@@ -216,7 +221,7 @@ const Board = () => {
             } else if (tools.current.tool === "circle") {
                 holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
             } else if (tools.current.tool === "text") {
-                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], text: "test", stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke:tools.current.stroke };
             }
 
             generateIncompleteObjects()
@@ -226,7 +231,7 @@ const Board = () => {
                     point: pos,
                     tool: tools.current.tool,
                     stroke: tools.current.stroke,
-                    text: "test",
+                    text: "Double click on me to change text",
                     room: room.current
                 });
             } else {
@@ -322,6 +327,10 @@ const Board = () => {
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
                     completedObjects[i].radius = data.radius
+                } else if (data.tool === "text") {
+                    completedObjects[i].points[0] = data.points[0]
+                    completedObjects[i].points[1] = data.points[1]
+                    completedObjects[i].text = data.text
                 }
             }
         });
@@ -457,9 +466,14 @@ const Board = () => {
         setValue(value => value + 1);
     }
 
+    const signOut = () => {
+        localStorage.removeItem('session');
+        setValue(value => value + 1);
+    }
+
     function ActionBar() {
         if (localStorage.getItem('session')) {
-            return <UserActions ref={r => (loadWhiteboardsUI.current = r)} class={classes.adminButton} makeNewWhiteboard={makeNewWhiteboard} changePermissions={handleChangePermissions} loadWhiteboard={handleJoin} loadWhiteboards={handleLoadWhiteboards} />;
+            return <UserActions ref={r => (loadWhiteboardsUI.current = r)} class={classes.adminButton} signOut={signOut} makeNewWhiteboard={makeNewWhiteboard} changePermissions={handleChangePermissions} loadWhiteboard={handleJoin} loadWhiteboards={handleLoadWhiteboards} />;
         } else {
             return <LoginButton class={classes.adminButton} login={handleLogin} signup={handleSignup} />;
         }
@@ -467,6 +481,10 @@ const Board = () => {
 
     const handleLoadWhiteboards = () => {
         current.emit('loadWhiteboards', localStorage.getItem('session'))
+    }
+
+    const handleCreateCopy = () => {
+        current.emit('createCopy', {session: localStorage.getItem('session'), room: room.current})
     }
 
     return (
@@ -518,7 +536,7 @@ const Board = () => {
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].size[0] = newAttrs.width
                                                     completedObjects[i].size[1] = newAttrs.height
-                                                    current.emit('updateObject', completedObjects[i]);
+                                                    current.emit('updateObject', {room: room.current, object: completedObjects[i]});
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -541,7 +559,7 @@ const Board = () => {
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].radius = newAttrs.radius
-                                                    current.emit('updateObject', completedObjects[i]);
+                                                    current.emit('updateObject', {room: room.current, object: completedObjects[i]});
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -551,14 +569,25 @@ const Board = () => {
                                 )
                             } else if (object.tool === "text") {
                                 return (
-                                    <Text
+                                    <BoardText
                                         key={i}
-                                        x={object.points[0]}
-                                        y={object.points[1]}
-                                        text={object.text}
-                                        fill={object.stroke}
-                                        fontFamily={'Calibri'}
-                                        fontSize={18}
+                                        shapeProps={object}
+                                        isSelected={object.selectID === selectedId}
+                                        onSelect={() => {
+                                            selectShape(object.selectID);
+                                        }}
+                                        onChange={(newAttrs) => {
+                                            completedObjects.map((testobj, i) => {
+                                                if (testobj.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
+                                                    completedObjects[i].points[0] = newAttrs.x
+                                                    completedObjects[i].points[1] = newAttrs.y
+                                                    completedObjects[i].text = newAttrs.text
+                                                    current.emit('updateObject', {room: room.current, object: completedObjects[i]});
+                                                }
+                                            });
+                                            setCompletedObjects([...completedObjects.concat()])
+                                        }}
+                                        onCanMove={isDragging}
                                     />
                                 )
                             }
@@ -639,7 +668,9 @@ const Board = () => {
                         <RadioButtonUncheckedIcon />
                     </IconButton>
                     <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "eraser"}}>
-                        <TouchAppIcon />
+                        <SvgIcon>
+                            <path d="M15.14,3C14.63,3 14.12,3.2 13.73,3.59L2.59,14.73C1.81,15.5 1.81,16.77 2.59,17.56L5.03,20H12.69L21.41,11.27C22.2,10.5 22.2,9.23 21.41,8.44L16.56,3.59C16.17,3.2 15.65,3 15.14,3M17,18L15,20H22V18" />
+                        </SvgIcon>
                     </IconButton>
                     <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "text"}}>
                         <TitleIcon />
@@ -695,6 +726,11 @@ const Board = () => {
             </Container>
             <Container className={classes.login} style={{display: 'inline-flex'}} maxWidth={false}>
                 <ActionBar />
+                <div>
+                    <Button onClick={handleCreateCopy}>
+                        Create copy
+                    </Button>
+                </div>
                 <div>
                     <JoinButton class={classes.adminButton} join={handleJoin} />
                 </div>

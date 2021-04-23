@@ -52,6 +52,8 @@
     ]
   },
   "devDependencies": {
+    "@mdi/js": "^5.9.55",
+    "@mdi/react": "^1.5.0",
     "bcrypt": "^5.0.1"
   }
 }

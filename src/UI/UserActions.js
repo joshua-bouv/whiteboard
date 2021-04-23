@@ -65,6 +65,9 @@ const UserActions = forwardRef((props, ref) => {
 
     return (
         <div className={props.class}>
+            <Button className={props.class} onClick={props.signOut}>
+                Sign out
+            </Button>
             <FormControl className={props.class} >
                 <Select
                     value={permissions}

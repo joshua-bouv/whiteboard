@@ -6,6 +6,8 @@ const io = require('socket.io')(http, {
     }
 });
 const {MongoClient} = require('mongodb');
+// https://stackoverflow.com/questions/4902569/node-js-mongodb-select-document-by-id-node-mongodb-native
+const ObjectId = require('mongodb').ObjectID;
 
 async function main(){
     const client = new MongoClient("mongodb+srv://whiteboard:siEuqzAie1kGjgi8@cluster0.nlqhr.mongodb.net/whiteboards?retryWrites=true&w=majority");
@@ -23,6 +25,24 @@ async function main(){
             for (let i = 0; i < length; i++) {
                 result += characters.charAt(Math.floor(Math.random() * charactersLength));
             }
+
+            let searchForUniqueID = true;
+            while (searchForUniqueID) {
+                let alreadyExists = false;
+                whiteboards.listCollections({name: result})
+                    .next(function (err, colExists) {
+                        if (colExists) {
+                            alreadyExists = true
+                        }
+                    });
+
+                if (alreadyExists) {
+                    result = makeID(9);
+                } else {
+                    searchForUniqueID = false
+                }
+            }
+
             return result;
         }
 
@@ -32,7 +52,7 @@ async function main(){
                     socket.emit('streamObject', doc)
                 }, function(err) {});  // finished finding objects
             } catch (e) {
-                console.log("Error sending whiteboard to client")
+                console.error("Error sending whiteboard to client")
                 console.error(e)
             }
         }
@@ -41,16 +61,23 @@ async function main(){
             try {
                 await whiteboards.collection(board).insertOne(data);
             } catch (e) {
-                console.log("Error sending object to client")
+                console.error("Error sending object to client")
                 console.error(e)
             }
         }
 
         async function updateObjectOnBoard(board, data) {
             try {
-                await whiteboards.collection(board).findOneAndUpdate({_id:data._id}, {$set: {}})
+                if (data.tool === "square") {
+                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, size: data.size}})
+                } else if (data.tool === "circle") { // circle
+                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, radius: data.radius}})
+                } else if (data.tool === "text") {
+                    console.log("changing text")
+                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {text: data.text}})
+                }
             } catch (e) {
-                console.log("Error updating object to client")
+                console.error("Error updating object to client")
                 console.error(e)
             }
         }
@@ -59,7 +86,7 @@ async function main(){
             try {
                 await whiteboards.collection(board).deleteMany({});
             } catch (e) {
-                console.log("Error clearing whiteboard")
+                console.error("Error clearing whiteboard")
                 console.error(e)
             }
         }
@@ -68,7 +95,7 @@ async function main(){
             try {
                 await whiteboards.collection(board).findOneAndDelete({}, {sort: {_id: -1}})
             } catch (e) {
-                console.log("Error undoing whiteboard")
+                console.error("Error undoing whiteboard")
                 console.error(e)
             }
         }
@@ -82,7 +109,7 @@ async function main(){
                     return callback(false)
                 })
             } catch (e) {
-                console.log("Error logging in")
+                console.error("Error logging in")
                 console.error(e)
             }
         }
@@ -100,7 +127,7 @@ async function main(){
                     await users.collection("users").insertOne(data);
                 }
             } catch (e) {
-                console.log("Error registering user")
+                console.error("Error registering user")
                 console.error(e)
             }
         }
@@ -108,10 +135,11 @@ async function main(){
         async function getWhiteboards(userID, callback) {
             try {
                 await users.collection("permissions").find({owner: userID}).toArray().then(items => {
+                    items = items.filter(whiteboard => whiteboard.snapshot !== null);
                     return callback(items)
                 })
             } catch (e) {
-                console.log("Error finding users whiteboards")
+                console.error("Error finding users whiteboards")
                 console.error(e)
             }
         }
@@ -129,7 +157,7 @@ async function main(){
                     await users.collection("permissions").findOneAndUpdate({name: data.room}, {$set: {permission: data.newPermission}})
                 }
             } catch (e) {
-                console.log("Error changing permission")
+                console.error("Error changing permission")
                 console.error(e)
             }
         }
@@ -138,7 +166,23 @@ async function main(){
             try {
                 await users.collection("permissions").findOneAndUpdate({name: room}, {$set: {snapshot: image}})
             } catch (e) {
-                console.log("Error updating image")
+                console.error("Error updating image")
+                console.error(e)
+            }
+        }
+
+        async function createCopyOfBoard(originalWhiteboard, copyWhiteboard) {
+            try {
+                await whiteboards.collection(originalWhiteboard).find().forEach(function(doc){
+                    whiteboards.collection(copyWhiteboard).insertOne(doc);
+                });
+                await users.collection("permissions").findOne({name: originalWhiteboard}).then(results => {
+                    console.log(results)
+                    users.collection("permissions").findOneAndUpdate({name: copyWhiteboard}, {$set: {snapshot: results.snapshot}})
+                })
+            } catch (e) {
+                console.error("Failed to create copy of whiteboard")
+                console.error(e)
             }
         }
 
@@ -146,28 +190,11 @@ async function main(){
             function addUser(room) {
                 socket.leaveAll();
                 socket.join(room);
-                console.log("User connected to room "+room)
+                console.error("User connected to room "+room)
             }
 
             function makeNewWhiteboard(userID) {
                 let newWhiteboard = makeID(9);
-                let searchForUniqueID = true;
-                while (searchForUniqueID) {
-                    let alreadyExists = false;
-                    whiteboards.listCollections({name: newWhiteboard})
-                        .next(function (err, colExists) {
-                            if (colExists) {
-                                alreadyExists = true
-                            }
-                        });
-
-                    if (alreadyExists) {
-                        newWhiteboard = makeID(9);
-                    } else {
-                        searchForUniqueID = false
-                    }
-                }
-
                 whiteboards.createCollection(newWhiteboard);
                 addUser(newWhiteboard)
                 users.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: {}, snapshot: null});
@@ -182,10 +209,10 @@ async function main(){
                     if (isLoggedIn) {
                         socket.emit('loggedIn', isLoggedIn)
                         socket.emit('displayNotification', "Hi "+data.user)
-                        console.log("Logging in user "+data.user)
+                        console.error("Logging in user "+data.user)
                     } else {
                         socket.emit('displayNotification', "Incorrect username/password")
-                        console.log("User not found / wrong password")
+                        console.error("User not found / wrong password")
                     }
                 })
             });
@@ -231,8 +258,8 @@ async function main(){
 
             // To update an object on the whiteboard
             socket.on('updateObject', (data) => {
-                //updateObjectOnBoard(data.room, data)
-                socket.to(data.room).broadcast.emit('updateObject', data);
+                updateObjectOnBoard(data.room, data.object)
+                socket.to(data.room).broadcast.emit('updateObject', data.object);
             });
 
             // To clear whiteboard across all clients
@@ -258,7 +285,6 @@ async function main(){
             // To load a whiteboard
             socket.on('loadWhiteboards', (userID) => {
                 getWhiteboards(userID, function(whiteboards) {
-                    console.log(whiteboards)
                     socket.emit('loadWhiteboards', whiteboards);
                 })
             });
@@ -272,11 +298,20 @@ async function main(){
                 }
                 socket.emit('displayNotification', "Permissions changed to "+text)
             })
+
+            socket.on('createCopy', (data) => {
+                let copyWhiteboardID = makeNewWhiteboard(data.session)
+                createCopyOfBoard(data.room, copyWhiteboardID)
+                addUser(copyWhiteboardID)
+                sendWhiteboardToClient(copyWhiteboardID, socket)
+                socket.emit('setupWhiteboard', copyWhiteboardID)
+                socket.emit('displayNotification', "Joined whiteboard "+copyWhiteboardID)
+            })
         });
 
-        http.listen(8080,() => console.log(`Whiteboard server active`));
+        http.listen(8080,() => console.error(`Whiteboard server active`));
     } catch (e) {
-        console.log("General error")
+        console.error("General error")
         console.error(e);
     }
 }
