@@ -53,7 +53,7 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove 
                         x: node.x(),
                         y: node.y(),
                         width: Math.max(5, node.width() * scaleX),
-                        height: Math.max(node.height() * scaleY),
+                        height: Math.max(1, node.height() * scaleY),
                     });
                 }}
             />

@@ -15,7 +15,7 @@ async function main(){
     try {
         await client.connect();
         const whiteboards = client.db("whiteboards");
-        const users = client.db("users");
+        const storage = client.db("storage");
 
         // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
         function makeID(length) {
@@ -62,6 +62,8 @@ async function main(){
                 await whiteboards.collection(board).insertOne(data);
             } catch (e) {
                 console.error("Error sending object to client")
+                console.log(board)
+                console.log(data)
                 console.error(e)
             }
         }
@@ -73,7 +75,6 @@ async function main(){
                 } else if (data.tool === "circle") { // circle
                     await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, radius: data.radius}})
                 } else if (data.tool === "text") {
-                    console.log("changing text")
                     await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {text: data.text}})
                 }
             } catch (e) {
@@ -102,7 +103,7 @@ async function main(){
 
         async function login(data, callback) {
             try {
-                await users.collection("users").findOne({user: data.user}).then(results => {
+                await storage.collection("users").findOne({user: data.user, password: data.password}).then(results => {
                     if (results) {
                         return callback(results['_id'])
                     }
@@ -117,14 +118,14 @@ async function main(){
         async function register(data) {
             try {
                 let uniqueUser = true
-                await users.collection("users").findOne({user: data.user}).then(results => {
+                await storage.collection("users").findOne({user: data.user}).then(results => {
                     if (results) {
                         uniqueUser = false
                     }
                 })
 
                 if (uniqueUser) {
-                    await users.collection("users").insertOne(data);
+                    await storage.collection("users").insertOne(data);
                 }
             } catch (e) {
                 console.error("Error registering user")
@@ -134,7 +135,7 @@ async function main(){
 
         async function getWhiteboards(userID, callback) {
             try {
-                await users.collection("permissions").find({owner: userID}).toArray().then(items => {
+                await storage.collection("permissions").find({owner: userID}).toArray().then(items => {
                     items = items.filter(whiteboard => whiteboard.snapshot !== null);
                     return callback(items)
                 })
@@ -147,14 +148,14 @@ async function main(){
         async function changeGlobalPermission(data) {
             try {
                 let userIsOwner = false
-                await users.collection("permissions").findOne({owner: data.user}).then(results => {
+                await storage.collection("permissions").findOne({owner: data.user}).then(results => {
                     if (results) {
                         userIsOwner = true
                     }
                 })
 
                 if (userIsOwner) {
-                    await users.collection("permissions").findOneAndUpdate({name: data.room}, {$set: {permission: data.newPermission}})
+                    await storage.collection("permissions").findOneAndUpdate({name: data.room}, {$set: {permission: data.newPermission}})
                 }
             } catch (e) {
                 console.error("Error changing permission")
@@ -164,7 +165,7 @@ async function main(){
 
         async function updateSnapshot(room, image) {
             try {
-                await users.collection("permissions").findOneAndUpdate({name: room}, {$set: {snapshot: image}})
+                await storage.collection("permissions").findOneAndUpdate({name: room}, {$set: {snapshot: image}})
             } catch (e) {
                 console.error("Error updating image")
                 console.error(e)
@@ -176,9 +177,8 @@ async function main(){
                 await whiteboards.collection(originalWhiteboard).find().forEach(function(doc){
                     whiteboards.collection(copyWhiteboard).insertOne(doc);
                 });
-                await users.collection("permissions").findOne({name: originalWhiteboard}).then(results => {
-                    console.log(results)
-                    users.collection("permissions").findOneAndUpdate({name: copyWhiteboard}, {$set: {snapshot: results.snapshot}})
+                await storage.collection("permissions").findOne({name: originalWhiteboard}).then(results => {
+                    storage.collection("permissions").findOneAndUpdate({name: copyWhiteboard}, {$set: {snapshot: results.snapshot}})
                 })
             } catch (e) {
                 console.error("Failed to create copy of whiteboard")
@@ -196,8 +196,7 @@ async function main(){
             function makeNewWhiteboard(userID) {
                 let newWhiteboard = makeID(9);
                 whiteboards.createCollection(newWhiteboard);
-                addUser(newWhiteboard)
-                users.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: {}, snapshot: null});
+                storage.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: {}, snapshot: null});
 
                 return newWhiteboard
             }
@@ -250,10 +249,12 @@ async function main(){
             });
 
             socket.on('objectEnd', (data) => {
-                data.object['user'] = socket.id;
-                addObjectToBoard(data.room, data.object)
-                updateSnapshot(data.room, data.image)
-                socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
+                if (data.object.length !== 0) {
+                    data.object['user'] = socket.id;
+                    addObjectToBoard(data.room, data.object)
+                    updateSnapshot(data.room, data.image)
+                    socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
+                }
             });
 
             // To update an object on the whiteboard

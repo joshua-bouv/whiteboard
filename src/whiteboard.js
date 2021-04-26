@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Line, Rect, Circle, Text } from 'react-konva';
+import { Stage, Layer, Line, Rect, Circle, Group } from 'react-konva';
 
 import BoardRectangle from './Components/BoardRectangle'
 import BoardCircle from './Components/BoardCircle'
@@ -12,6 +12,7 @@ import Popover from '@material-ui/core/Popover';
 
 import {ColorButton} from 'material-ui-color';
 
+
 import CreateIcon from '@material-ui/icons/Create';
 import PaletteIcon from '@material-ui/icons/Palette';
 import AspectRatioIcon from '@material-ui/icons/AspectRatio';
@@ -22,9 +23,6 @@ import GestureIcon from '@material-ui/icons/Gesture';
 import CheckBoxOutlineBlankIcon from '@material-ui/icons/CheckBoxOutlineBlank';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import TitleIcon from '@material-ui/icons/Title';
-import TouchAppIcon from '@material-ui/icons/TouchApp';
-import Icon from '@mdi/react'
-import { mdiEraserVariant } from '@mdi/js';
 import { useSnackbar } from 'notistack';
 
 import SidebarItem from './UI/SidebarItem'
@@ -36,18 +34,18 @@ import LoginButton from "./UI/Login";
 import UserActions from "./UI/UserActions";
 import JoinButton from "./UI/JoinWhiteboard";
 import BoardText from "./Components/BoardText";
-import {SvgIcon} from "@material-ui/core";
+import {SvgIcon, Tooltip} from "@material-ui/core";
 import Button from "@material-ui/core/Button";
 
 let current = io.connect(':8080/');
 let sessionRoom = sessionStorage.getItem('session')
 let urlRoom = window.location.pathname.substring(1)
-if (sessionRoom) {
-    console.log("joining room from session")
-    current.emit('joinRoom', sessionRoom)
-} else if (urlRoom !== "") {
+if (urlRoom !== "") {
     console.log("joining room from url")
     current.emit('joinRoom', urlRoom)
+} else if (sessionRoom) {
+    console.log("joining room from session")
+    current.emit('joinRoom', sessionRoom)
 } else {
     console.log("making new room")
     current.emit('requestRoom', localStorage.getItem('session'))
@@ -90,11 +88,13 @@ const Board = () => {
     let [incompleteObjects, setIncompleteObjects] = useState([]);
     let [completedObjects, setCompletedObjects] = useState([]);
     const [value, setValue] = useState(0); // for forcing refreshes
-    const holdingObjects = useRef([]);
+    let holdingObjects = useRef([]);
     let historicSnapshots = useRef([]);
     let historyCount = useRef(0);
     let room = useRef("");
     const outer = useRef(null);
+    const group = useRef(null)
+    const group2 = useRef(null)
     const isDrawing = useRef(false);
     const loadWhiteboardsUI = useRef(null);
     const classes = useStyles();
@@ -112,6 +112,18 @@ const Board = () => {
         'grey': '#95a5a6',
         'yellow': '#f1c40f',
     };
+
+    // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+    function makeID(length) {
+        let result = '';
+        let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let charactersLength = characters.length;
+        for (let i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+
+        return result;
+    }
 
     useEffect(() => {
         current.on('objectStart', handleSocketDown);
@@ -168,17 +180,16 @@ const Board = () => {
     }
 
     const drawObject = (point, user) => {
-        let lastObject = holdingObjects.current[user]; // gets the latest object added to whiteboard
+        let lastObject = holdingObjects.current[user];
+        let inUseTool = lastObject.tool;
 
-        if (tools.current.tool === "line" || tools.current.tool === "eraser") {
+        if (inUseTool === "line" || inUseTool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
-            generateIncompleteObjects()
-        } else if (tools.current.tool === "square") { // potentially other objects
+        } else if (inUseTool === "square") { // potentially other objects
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
             lastObject.size = [x, y]; // update size of object
-            generateIncompleteObjects()
-        } else if (tools.current.tool === "circle") {
+        } else if (inUseTool === "circle") {
             let radius;
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
@@ -192,7 +203,10 @@ const Board = () => {
             } else {
                 lastObject.radius = -radius;
             }
-            generateIncompleteObjects()
+        }
+
+        if (tools.current.tool !== "text") {
+            generateIncompleteObjects();
         }
     };
 
@@ -215,13 +229,13 @@ const Board = () => {
             const pos = e.target.getStage().getPointerPosition();
 
             if (tools.current.tool === "line" || tools.current.tool === "eraser") {
-                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], stroke:tools.current.stroke };
             } else if (tools.current.tool === "square") {
-                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke:tools.current.stroke };
             } else if (tools.current.tool === "circle") {
-                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
             } else if (tools.current.tool === "text") {
-                holdingObjects.current['self'] = { selectID: historyCount.current, tool:tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke:tools.current.stroke };
             }
 
             generateIncompleteObjects()
@@ -254,13 +268,13 @@ const Board = () => {
         const pos = data.point;
 
         if (data.tool === "line" || data.tool === "eraser") {
-            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], stroke:data.stroke };
+            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], stroke:data.stroke };
         } else if (data.tool === "square") {
-            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], size: [0, 0], stroke:data.stroke };
+            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], size: [0, 0], stroke:data.stroke };
         } else if (data.tool === "circle") {
-            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], radius: 0, stroke:data.stroke };
+            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], radius: 0, stroke:data.stroke };
         } else if (data.tool === "text") {
-            holdingObjects.current[data.user] = { selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], text:data.text, stroke:data.stroke };
+            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], text:data.text, stroke:data.stroke };
         }
     };
 
@@ -287,11 +301,14 @@ const Board = () => {
         if (isDrawingTool) {
             isDrawing.current = false;
             let completedObject = holdingObjects.current['self'];
-            completedObjects.push(completedObject)
-            setCompletedObjects([...completedObjects.concat()])
-            let stage = e.target.getStage()
-            current.emit('objectEnd', {room:room.current, object: completedObject, image: stage.toDataURL({pixelRatio: 0.1})});
-            holdingObjects.current['self'] = [];
+            console.log(completedObject)
+            if (completedObject !== []) {
+                completedObjects.push(completedObject)
+                setCompletedObjects([...completedObjects.concat()])
+                let stage = e.target.getStage()
+                current.emit('objectEnd', {room:room.current, object: completedObject, image: stage.toDataURL({pixelRatio: 0.1})});
+                holdingObjects.current['self'] = [];
+            }
         }
         generateIncompleteObjects()
         generateHistoryStep() // probs needs moving
@@ -317,8 +334,10 @@ const Board = () => {
     /* For streaming objects from the database */
     const handleUpdateObject = (data) => {
         completedObjects.map((testobj, i) => {
-            if (testobj._id === data._id) {
+            if (testobj.selectID === data.selectID) {
                 if (data.tool === "square") {
+                    console.log({...completedObjects[i]})
+                    console.log(data)
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
                     completedObjects[i].size[0] = data.size[0]
@@ -339,11 +358,8 @@ const Board = () => {
     }
 
     const clearWhiteboard = () => {
-        incompleteObjects = []
-        completedObjects = []
         setIncompleteObjects([])
         setCompletedObjects([])
-        //outer.current.getStage().clear();
     }
 
     const undoWhiteboard = () => {
@@ -378,7 +394,6 @@ const Board = () => {
     }
 
     const handleJoin = (newRoom) => {
-        console.log(newRoom)
         clearWhiteboard()
         current.emit('joinRoom', newRoom.whiteboardID);
     }
@@ -413,22 +428,45 @@ const Board = () => {
         setAnchorEl(null);
     }
 
+    let groupScale = useRef(1);
+    let groupPosX = useRef(0);
+    let groupPosY = useRef(0);
+
+    function getRelativePointerPosition(node) {
+        var transform = node.getAbsoluteTransform().copy();
+        // to detect relative position we need to invert transform
+        transform.invert();
+
+        // get pointer (say mouse or touch) position
+        var pos = node.getStage().getPointerPosition();
+
+        // now we can find relative point
+        return transform.point(pos);
+    }
+
     var scaleBy = 0.95;
     const handleMouseWheel = (e) => {
         let stage = e.target.getStage()
-        let oldScale = stage.scaleX()
+        let oldScale = groupScale.current;
         let pointer = stage.getPointerPosition()
         let mousePointTo = {
-            x: (pointer.x - stage.x()) / oldScale,
-            y: (pointer.y - stage.y()) / oldScale,
+            x: (pointer.x - groupPosX.current) / oldScale,
+            y: (pointer.y - groupPosY.current) / oldScale,
         };
+
         let newScale = e.evt.deltaY > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-        stage.scale({ x: newScale, y: newScale });
+        groupScale.current = newScale;
+        //stage.scale({ x: newScale, y: newScale });
         let newPos = {
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale,
         };
-        stage.position(newPos);
+        groupPosX.current = newPos.x;
+        groupPosY.current = newPos.y;
+        //stage.position(newPos);
+
+        setValue(value => value + 1);
+
         stage.batchDraw();
     }
 
@@ -502,6 +540,12 @@ const Board = () => {
                     ref={outer}
                     listening={true}
                 >
+                    <Group
+                        ref={group}
+                        scale={{x: groupScale.current, y: groupScale.current}}
+                        x={groupPosX.current}
+                        y={groupPosY.current}
+                    >
                     {
                         completedObjects.map((object, i) => {
                             if (object.tool === "line" || object.tool === "eraser") {
@@ -639,6 +683,7 @@ const Board = () => {
                             }
                         })
                     }
+                    </Group>
                 </Layer>
             </Stage>
             <Container className={classes.root} maxWidth="sm">
@@ -658,23 +703,33 @@ const Board = () => {
                         horizontal: 'left',
                     }}
                 >
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "line"}}>
-                        <GestureIcon />
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "square"}}>
-                        <CheckBoxOutlineBlankIcon />
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "circle"}}>
-                        <RadioButtonUncheckedIcon />
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "eraser"}}>
-                        <SvgIcon>
-                            <path d="M15.14,3C14.63,3 14.12,3.2 13.73,3.59L2.59,14.73C1.81,15.5 1.81,16.77 2.59,17.56L5.03,20H12.69L21.41,11.27C22.2,10.5 22.2,9.23 21.41,8.44L16.56,3.59C16.17,3.2 15.65,3 15.14,3M17,18L15,20H22V18" />
-                        </SvgIcon>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "text"}}>
-                        <TitleIcon />
-                    </IconButton>
+                    <Tooltip title="Free draw">
+                        <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "line"}}>
+                            <GestureIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Square">
+                        <IconButton aria-label="Square" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "square"}}>
+                            <CheckBoxOutlineBlankIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Circle">
+                        <IconButton aria-label="Circle" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "circle"}}>
+                            <RadioButtonUncheckedIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Eraser">
+                        <IconButton aria-label="Eraser" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "eraser"}}>
+                            <SvgIcon>
+                                <path d="M15.14,3C14.63,3 14.12,3.2 13.73,3.59L2.59,14.73C1.81,15.5 1.81,16.77 2.59,17.56L5.03,20H12.69L21.41,11.27C22.2,10.5 22.2,9.23 21.41,8.44L16.56,3.59C16.17,3.2 15.65,3 15.14,3M17,18L15,20H22V18" />
+                            </SvgIcon>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Text">
+                        <IconButton aria-label="Text" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleStartDrawing(); tools.current.tool = "text"}}>
+                            <TitleIcon />
+                        </IconButton>
+                    </Tooltip>
                 </Popover>
                 <Popover
                     id={id2}
@@ -692,36 +747,50 @@ const Board = () => {
                         horizontal: 'left',
                     }}
                 >
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "black"}}>
-                        <ColorButton color={strokes['black']}/>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "red"}}>
-                        <ColorButton color={strokes['red']}/>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "green"}}>
-                        <ColorButton color={strokes['green']}/>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "blue"}}>
-                        <ColorButton color={strokes['blue']}/>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "purple"}}>
-                        <ColorButton color={strokes['purple']}/>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "grey"}}>
-                        <ColorButton color={strokes['grey']}/>
-                    </IconButton>
-                    <IconButton aria-label="Draw" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2();tools.current.stroke = "yellow"}}>
-                        <ColorButton color={strokes['yellow']}/>
-                    </IconButton>
+                    <Tooltip title="Black">
+                        <IconButton aria-label="Black" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "black"}}>
+                            <ColorButton color={strokes['black']}/>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Red">
+                        <IconButton aria-label="Red" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "red"}}>
+                            <ColorButton color={strokes['red']}/>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Green">
+                        <IconButton aria-label="Green" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "green"}}>
+                            <ColorButton color={strokes['green']}/>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Blue">
+                        <IconButton aria-label="Blue" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "blue"}}>
+                            <ColorButton color={strokes['blue']}/>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Purple">
+                        <IconButton aria-label="Purple" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "purple"}}>
+                            <ColorButton color={strokes['purple']}/>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Grey">
+                        <IconButton aria-label="Grey" aria-controls="simple-menu" aria-haspopup="true" onClick={() => {handleClose2(); tools.current.stroke = "grey"}}>
+                            <ColorButton color={strokes['grey']}/>
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Yellow">
+                        <IconButton aria-label="Yellow" aria-controls="simple-menu" aria-haspopup="true"  onClick={() => {handleClose2(); tools.current.stroke = "yellow"}}>
+                            <ColorButton color={strokes['yellow']}/>
+                        </IconButton>
+                    </Tooltip>
                     {/*<SideBarSubItem function={handleClose2} stroke={tools.current.stroke} hex={strokes['yellow']}/>*/}
                 </Popover>
                 <List component="nav">
-                    <SidebarItem icon=<CreateIcon /> function={handleClick} class={classes.button}/>
-                    <SidebarItem icon=<PaletteIcon /> function={handleClick2} class={classes.button}/>
-                    <SidebarItem icon=<AspectRatioIcon /> function={handleMoveObjects} class={classes.button}/>
-                    <SidebarItem icon=<UndoIcon /> function={handleUndo} class={classes.button}/>
-                    <SidebarItem icon=<RedoIcon /> function={handleRedo} class={classes.button}/>
-                    <SidebarItem icon=<DeleteIcon /> function={handleClear} class={classes.button}/>
+                    <SidebarItem icon=<CreateIcon /> tooltip={"Draw"} function={handleClick} class={classes.button}/>
+                    <SidebarItem icon=<PaletteIcon /> tooltip={"Colours"}  function={handleClick2} class={classes.button}/>
+                    <SidebarItem icon=<AspectRatioIcon /> tooltip={"Manipulate object"}  function={handleMoveObjects} class={classes.button}/>
+                    <SidebarItem icon=<UndoIcon /> tooltip={"Undo"}  function={handleUndo} class={classes.button}/>
+                    <SidebarItem icon=<RedoIcon /> tooltip={"Redo"}  function={handleRedo} class={classes.button}/>
+                    <SidebarItem icon=<DeleteIcon /> tooltip={"Clear whiteboard"}  function={handleClear} class={classes.button}/>
                 </List>
             </Container>
             <Container className={classes.login} style={{display: 'inline-flex'}} maxWidth={false}>
