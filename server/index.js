@@ -115,17 +115,17 @@ async function main(){
             }
         }
 
-        async function register(data) {
+        async function register(username) {
             try {
                 let uniqueUser = true
-                await storage.collection("users").findOne({user: data.user}).then(results => {
+                await storage.collection("users").findOne({user: username}).then(results => {
                     if (results) {
                         uniqueUser = false
                     }
                 })
 
                 if (uniqueUser) {
-                    await storage.collection("users").insertOne(data);
+                    await storage.collection("users").insertOne(username);
                 }
             } catch (e) {
                 console.error("Error registering user")
@@ -155,7 +155,7 @@ async function main(){
                 })
 
                 if (userIsOwner) {
-                    await storage.collection("permissions").findOneAndUpdate({name: data.room}, {$set: {permission: data.newPermission}})
+                    await storage.collection("permissions").findOneAndUpdate({name: data.whiteboardID}, {$set: {permission: data.newPermission}})
                 }
             } catch (e) {
                 console.error("Error changing permission")
@@ -163,9 +163,9 @@ async function main(){
             }
         }
 
-        async function updateSnapshot(room, image) {
+        async function updateSnapshot(whiteboardID, image) {
             try {
-                await storage.collection("permissions").findOneAndUpdate({name: room}, {$set: {snapshot: image}})
+                await storage.collection("permissions").findOneAndUpdate({name: whiteboardID}, {$set: {snapshot: image}})
             } catch (e) {
                 console.error("Error updating image")
                 console.error(e)
@@ -186,11 +186,18 @@ async function main(){
             }
         }
 
+        let socketCurrentBoard = {}
+
         io.on('connection', socket => {
-            function addUser(room) {
+            function addUser(whiteboardID, username) {
+                if (username === null) {
+                    username = "guest"
+                }
                 socket.leaveAll();
-                socket.join(room);
-                console.error("User connected to room "+room)
+                socketCurrentBoard[socket.id] = {whiteboardID: whiteboardID, username: username}
+                socket.join(whiteboardID);
+
+                console.log(username+" connected to whiteboard "+whiteboardID)
             }
 
             function makeNewWhiteboard(userID) {
@@ -201,12 +208,19 @@ async function main(){
                 return newWhiteboard
             }
 
+            socket.on('disconnect', () => {
+                if (socketCurrentBoard[socket.id] != null) {
+                    console.log(socketCurrentBoard[socket.id].username + " disconnected form whiteboard "+socketCurrentBoard[socket.id].whiteboardID)
+                    socketCurrentBoard[socket.id] = null
+                }
+            })
+
             // To login to website
             socket.on('login', (data) => {
                 // escape stuff
                 login(data, function(isLoggedIn) {
                     if (isLoggedIn) {
-                        socket.emit('loggedIn', isLoggedIn)
+                        socket.emit('loggedIn', {uniqueID: isLoggedIn, username: data.user})
                         socket.emit('displayNotification', "Hi "+data.user)
                         console.error("Logging in user "+data.user)
                     } else {
@@ -218,69 +232,69 @@ async function main(){
 
             // To signup to website
             socket.on('signup', (data) => {
-                register(data)
+                register(data.user)
             });
 
             // To request a unique whiteboard
-            socket.on('requestRoom', (data) => {
-                let newWhiteboard = makeNewWhiteboard(data)
-                addUser(newWhiteboard)
-                socket.emit('setupWhiteboard', newWhiteboard)
+            socket.on('requestNewWhiteboard', (data) => {
+                let newWhiteboardID = makeNewWhiteboard(data.uniqueID)
+                addUser(newWhiteboardID, data.username)
+                socket.emit('setupWhiteboard', newWhiteboardID)
             });
 
             // To join a whiteboard
-            socket.on('joinRoom', (room) => {
-                addUser(room)
-                sendWhiteboardToClient(room, socket)
-                socket.emit('setupWhiteboard', room)
-                socket.emit('displayNotification', "Joined whiteboard "+room)
+            socket.on('joinWhiteboard', (data) => {
+                addUser(data.whiteboardID, data.username)
+                sendWhiteboardToClient(data.whiteboardID, socket)
+                socket.emit('setupWhiteboard', data.whiteboardID)
+                socket.emit('displayNotification', "Joined whiteboard "+data.whiteboardID)
             });
 
             // To start the drawing of a new object
             socket.on('objectStart', (data) => {
                 data['user'] = socket.id;
-                socket.to(data.room).emit('objectStart', data);
+                socket.to(data.whiteboardID).emit('objectStart', data);
             });
 
             // To draw whiteboard across all clients
             socket.on('drawing', (data) => {
                 data['user'] = socket.id;
-                socket.to(data.room).broadcast.emit('drawing', data);
+                socket.to(data.whiteboardID).broadcast.emit('drawing', data);
             });
 
             socket.on('objectEnd', (data) => {
                 if (data.object.length !== 0) {
                     data.object['user'] = socket.id;
-                    addObjectToBoard(data.room, data.object)
-                    updateSnapshot(data.room, data.image)
-                    socket.to(data.room).broadcast.emit('objectEnd', data.object.user);
+                    addObjectToBoard(data.whiteboardID, data.object)
+                    updateSnapshot(data.whiteboardID, data.image)
+                    socket.to(data.whiteboardID).broadcast.emit('objectEnd', data.object.user);
                 }
             });
 
             // To update an object on the whiteboard
             socket.on('updateObject', (data) => {
-                updateObjectOnBoard(data.room, data.object)
-                socket.to(data.room).broadcast.emit('updateObject', data.object);
+                updateObjectOnBoard(data.whiteboardID, data.object)
+                socket.to(data.whiteboardID).broadcast.emit('updateObject', data.object);
             });
 
             // To clear whiteboard across all clients
-            socket.on('clearWhiteboard', (room) => {
-                socket.to(room).broadcast.emit('clearWhiteboard');
-                clearBoard(room)
-                socket.to(room).emit('displayNotification', "Whiteboard cleared")
+            socket.on('clearWhiteboard', (whiteboardID) => {
+                socket.to(whiteboardID).broadcast.emit('clearWhiteboard');
+                clearBoard(whiteboardID)
+                socket.to(whiteboardID).emit('displayNotification', "Whiteboard cleared")
             });
 
             // To undo a change on the whiteboard
-            socket.on('undoWhiteboard', (room) => {
-                undoBoard(room)
-                socket.to(room).broadcast.emit('undoWhiteboard');
+            socket.on('undoWhiteboard', (whiteboardID) => {
+                undoBoard(whiteboardID)
+                socket.to(whiteboardID).broadcast.emit('undoWhiteboard');
             });
 
             // To redo a change on the whiteboard
             socket.on('redoWhiteboard', (data) => {
                 data.object['user'] = socket.id;
-                addObjectToBoard(data.room, data.object)
-                socket.to(data.room).broadcast.emit('redoWhiteboard');
+                addObjectToBoard(data.whiteboardID, data.object)
+                socket.to(data.whiteboardID).broadcast.emit('redoWhiteboard');
             });
 
             // To load a whiteboard
@@ -302,15 +316,15 @@ async function main(){
 
             socket.on('createCopy', (data) => {
                 let copyWhiteboardID = makeNewWhiteboard(data.session)
-                createCopyOfBoard(data.room, copyWhiteboardID)
-                addUser(copyWhiteboardID)
+                createCopyOfBoard(data.whiteboardID, copyWhiteboardID)
+                addUser(copyWhiteboardID, data.username)
                 sendWhiteboardToClient(copyWhiteboardID, socket)
                 socket.emit('setupWhiteboard', copyWhiteboardID)
                 socket.emit('displayNotification', "Joined whiteboard "+copyWhiteboardID)
             })
         });
 
-        http.listen(8080,() => console.error(`Whiteboard server active`));
+        http.listen(8080,() => console.error(`!!!!! Whiteboard server active !!!!!`));
     } catch (e) {
         console.error("General error")
         console.error(e);

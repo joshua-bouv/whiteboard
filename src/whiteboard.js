@@ -38,17 +38,17 @@ import {SvgIcon, Tooltip} from "@material-ui/core";
 import Button from "@material-ui/core/Button";
 
 let current = io.connect(':8080/');
-let sessionRoom = sessionStorage.getItem('session')
-let urlRoom = window.location.pathname.substring(1)
-if (urlRoom !== "") {
-    console.log("joining room from url")
-    current.emit('joinRoom', urlRoom)
-} else if (sessionRoom) {
-    console.log("joining room from session")
-    current.emit('joinRoom', sessionRoom)
+let sessionWhiteboardID = sessionStorage.getItem('whiteboardID')
+let urlWhiteboardID = window.location.pathname.substring(1)
+if (urlWhiteboardID !== "") {
+    console.log("Joining whiteboard from URL")
+    current.emit('joinWhiteboard', {whiteboardID: urlWhiteboardID, username: localStorage.getItem('username')})
+} else if (sessionWhiteboardID) {
+    console.log("Joining whiteboard from session")
+    current.emit('joinWhiteboard', {whiteboardID: sessionWhiteboardID, username: localStorage.getItem('username')})
 } else {
-    console.log("making new room")
-    current.emit('requestRoom', localStorage.getItem('session'))
+    console.log("Making new whiteboard")
+    current.emit('requestNewWhiteboard', {uniqueID: localStorage.getItem('uniqueID'), username: localStorage.getItem('username')})
 }
 
 const useStyles = makeStyles((theme) => ({
@@ -91,7 +91,7 @@ const Board = () => {
     let holdingObjects = useRef([]);
     let historicSnapshots = useRef([]);
     let historyCount = useRef(0);
-    let room = useRef("");
+    let whiteboardID = useRef("");
     const outer = useRef(null);
     const group = useRef(null)
     const group2 = useRef(null)
@@ -153,14 +153,14 @@ const Board = () => {
     }
 
     const setupWhiteboard = (data) => {
-        room.current = data
-        sessionStorage.setItem('session', data)
-        window.history.replaceState(null, "New Page Title", "/"+room.current)
+        whiteboardID.current = data
+        sessionStorage.setItem('whiteboardID', data)
+        window.history.replaceState(null, "New Page Title", "/"+whiteboardID.current)
     }
 
     const makeNewWhiteboard = () => {
         clearWhiteboard()
-        current.emit('requestRoom', localStorage.getItem('session'))
+        current.emit('requestNewWhiteboard', {uniqueID: localStorage.getItem('uniqueID'), username: localStorage.getItem('username')})
     }
 
     const generateIncompleteObjects = () => {
@@ -228,14 +228,15 @@ const Board = () => {
 
             const pos = e.target.getStage().getPointerPosition();
 
+            let objectID = makeID(9);
             if (tools.current.tool === "line" || tools.current.tool === "eraser") {
-                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], stroke: tools.current.stroke };
             } else if (tools.current.tool === "square") {
-                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke: tools.current.stroke };
             } else if (tools.current.tool === "circle") {
-                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke: tools.current.stroke };
             } else if (tools.current.tool === "text") {
-                holdingObjects.current['self'] = { selectID: makeID(9), tool:tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke:tools.current.stroke };
+                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke: tools.current.stroke };
             }
 
             generateIncompleteObjects()
@@ -246,14 +247,16 @@ const Board = () => {
                     tool: tools.current.tool,
                     stroke: tools.current.stroke,
                     text: "Double click on me to change text",
-                    room: room.current
+                    whiteboardID: whiteboardID.current,
+                    selectID: objectID
                 });
             } else {
                 current.emit('objectStart', {
                     point: pos,
                     tool: tools.current.tool,
                     stroke: tools.current.stroke,
-                    room: room.current
+                    whiteboardID: whiteboardID.current,
+                    selectID: objectID
                 });
             }
         }
@@ -268,13 +271,13 @@ const Board = () => {
         const pos = data.point;
 
         if (data.tool === "line" || data.tool === "eraser") {
-            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], stroke: data.stroke };
         } else if (data.tool === "square") {
-            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], size: [0, 0], stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], size: [0, 0], stroke: data.stroke };
         } else if (data.tool === "circle") {
-            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], radius: 0, stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], radius: 0, stroke: data.stroke };
         } else if (data.tool === "text") {
-            holdingObjects.current[data.user] = { test: "test", selectID: historyCount.current, tool:data.tool, points: [pos.x, pos.y], text:data.text, stroke:data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], text: data.text, stroke: data.stroke };
         }
     };
 
@@ -287,7 +290,7 @@ const Board = () => {
 
         current.emit('drawing', {
             point,
-            room: room.current
+            whiteboardID: whiteboardID.current
         });
     };
 
@@ -306,7 +309,7 @@ const Board = () => {
                 completedObjects.push(completedObject)
                 setCompletedObjects([...completedObjects.concat()])
                 let stage = e.target.getStage()
-                current.emit('objectEnd', {room:room.current, object: completedObject, image: stage.toDataURL({pixelRatio: 0.1})});
+                current.emit('objectEnd', {whiteboardID:whiteboardID.current, object: completedObject, image: stage.toDataURL({pixelRatio: 0.1})});
                 holdingObjects.current['self'] = [];
             }
         }
@@ -379,23 +382,23 @@ const Board = () => {
     const handleClear = () => {
         clearWhiteboard()
         enqueueSnackbar("Whiteboard cleared");
-        current.emit('clearWhiteboard', room.current);
+        current.emit('clearWhiteboard', whiteboardID.current);
     }
 
     const handleUndo = () => {
         undoWhiteboard()
-        current.emit('undoWhiteboard', room.current);
+        current.emit('undoWhiteboard', whiteboardID.current);
     }
 
     const handleRedo = () => {
         redoWhiteboard()
         let latestLine = historicSnapshots.current[historyCount.current-1]
-        current.emit('redoWhiteboard', {room:room.current, object: latestLine[latestLine.length-1]});
+        current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
     }
 
-    const handleJoin = (newRoom) => {
+    const handleJoin = (newWhiteboardID) => {
         clearWhiteboard()
-        current.emit('joinRoom', newRoom.whiteboardID);
+        current.emit('joinWhiteboard', {whiteboardID: newWhiteboardID.whiteboardID, username: localStorage.getItem('username')});
     }
 
     const handleLogin = (form) => {
@@ -471,7 +474,7 @@ const Board = () => {
     }
 
     const handleChangePermissions = (newPermission) => {
-        current.emit('changeGlobalPermission', {room: room.current, user: localStorage.getItem('session'), newPermission: newPermission})
+        current.emit('changeGlobalPermission', {whiteboardID: whiteboardID.current, user: localStorage.getItem('uniqueID'), newPermission: newPermission})
     }
 
     const [anchorEl, setAnchorEl] = React.useState(null);
@@ -500,17 +503,19 @@ const Board = () => {
     const id2 = open2 ? 'simple-popover' : undefined;
 
     const loggedIn = (data) => {
-        localStorage.setItem('session', data)
+        localStorage.setItem('uniqueID', data.uniqueID)
+        localStorage.setItem('username', data.username)
         setValue(value => value + 1);
     }
 
     const signOut = () => {
-        localStorage.removeItem('session');
+        localStorage.removeItem('uniqueID');
+        localStorage.removeItem('username')
         setValue(value => value + 1);
     }
 
     function ActionBar() {
-        if (localStorage.getItem('session')) {
+        if (localStorage.getItem('uniqueID')) {
             return <UserActions ref={r => (loadWhiteboardsUI.current = r)} class={classes.adminButton} signOut={signOut} makeNewWhiteboard={makeNewWhiteboard} changePermissions={handleChangePermissions} loadWhiteboard={handleJoin} loadWhiteboards={handleLoadWhiteboards} />;
         } else {
             return <LoginButton class={classes.adminButton} login={handleLogin} signup={handleSignup} />;
@@ -518,11 +523,11 @@ const Board = () => {
     }
 
     const handleLoadWhiteboards = () => {
-        current.emit('loadWhiteboards', localStorage.getItem('session'))
+        current.emit('loadWhiteboards', localStorage.getItem('uniqueID'))
     }
 
     const handleCreateCopy = () => {
-        current.emit('createCopy', {session: localStorage.getItem('session'), room: room.current})
+        current.emit('createCopy', {session: localStorage.getItem('uniqueID'), whiteboardID: whiteboardID.current, username: localStorage.getItem('username')})
     }
 
     return (
@@ -580,7 +585,7 @@ const Board = () => {
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].size[0] = newAttrs.width
                                                     completedObjects[i].size[1] = newAttrs.height
-                                                    current.emit('updateObject', {room: room.current, object: completedObjects[i]});
+                                                    current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -603,7 +608,7 @@ const Board = () => {
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].radius = newAttrs.radius
-                                                    current.emit('updateObject', {room: room.current, object: completedObjects[i]});
+                                                    current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -626,7 +631,7 @@ const Board = () => {
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].text = newAttrs.text
-                                                    current.emit('updateObject', {room: room.current, object: completedObjects[i]});
+                                                    current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
