@@ -5,6 +5,8 @@ import {Button, Tooltip} from "@material-ui/core";
 import BlockIcon from '@material-ui/icons/Block';
 import CreateIcon from '@material-ui/icons/Create';
 import IconButton from "@material-ui/core/IconButton";
+import Typography from "@material-ui/core/Typography";
+import Paper from '@material-ui/core/Paper';
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -15,8 +17,8 @@ const useStyles = makeStyles((theme) => ({
         bottom: 40,
         right: 0,
         zIndex: 1,
-        border: '1px solid',
         backgroundColor: theme.palette.background.paper,
+        padding: '5px'
     },
 }));
 
@@ -40,25 +42,27 @@ function ViewersList(props) {
                     View viewers
                 </Button>
                 {open ? (
-                    <div className={classes.dropdown}>
+                    <Paper className={classes.dropdown}>
                         {viewersList.map((object) => {
                             return (
-                                <div key={object}>
-                                    {object}
+                                <div key={object} style={{display: 'inline-flex', width: '250px', right: '0', justifyContent: 'flex-end'}}>
+                                    <Typography style={{width: 'inherit', alignSelf: 'center'}}>
+                                        {object}
+                                    </Typography>
                                     <Tooltip title="Block access">
-                                        <IconButton onClick={props.blockUser}>
+                                        <IconButton onClick={() => {props.blockUser(object)}}>
                                             <BlockIcon />
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Give access">
-                                        <IconButton onClick={props.allowUser}>
+                                        <IconButton onClick={() => {props.allowUser(object)}}>
                                             <CreateIcon />
                                         </IconButton>
                                     </Tooltip>
                                 </div>
                             )
                         })}
-                    </div>
+                    </Paper>
                 ) : null}
             </div>
         </ClickAwayListener>

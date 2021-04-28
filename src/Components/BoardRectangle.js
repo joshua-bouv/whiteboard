@@ -12,7 +12,7 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove 
         width:shapeProps.size[0],
         height:shapeProps.size[1],
         fill:shapeProps.stroke,
-        draggable:true,
+        draggable:onCanMove,
         listening:true,
     }
 
@@ -32,7 +32,6 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove 
                 onTap={onSelect}
                 ref={shapeRef}
                 {...shapeProps}
-                draggable
                 onDragEnd={(e) => {
                     onChange({
                         ...shapeProps,

@@ -29,7 +29,6 @@ import SidebarItem from './UI/SidebarItem'
 
 import './styles/board.css';
 import io from "socket.io-client";
-import SideBarSubItem from "./UI/SideBarSubItem";
 import LoginButton from "./UI/Login";
 import UserActions from "./UI/UserActions";
 import JoinButton from "./UI/JoinWhiteboard";
@@ -107,6 +106,9 @@ const Board = () => {
     const group2 = useRef(null)
     const isDrawing = useRef(false);
     const loadWhiteboardsUI = useRef(null);
+    const isAllowedToDraw = useRef(false);
+    let [globalPermission, setGlobalPermission] = useState('read');
+    const ownerOfWhiteboard = useRef(false);
     const classes = useStyles();
     const { enqueueSnackbar } = useSnackbar();
 
@@ -149,6 +151,7 @@ const Board = () => {
         current.on('displayNotification', displayNotification);
         current.on('loadWhiteboards', loadWhiteboards);
         current.on('viewersChanged', viewersChanged);
+        current.on('permissionsChanged', permissionChanged);
 
         return () => {
             current.off();
@@ -157,6 +160,29 @@ const Board = () => {
 
     const viewersChanged = (data) => {
         setViewersList(data)
+    }
+
+    const loggedIn = (data) => {
+        localStorage.setItem('uniqueID', data.uniqueID)
+        localStorage.setItem('username', data.username)
+        setValue(value => value + 1);
+    }
+
+    const permissionChanged = (data) => {
+        let username = localStorage.getItem('username')
+        let canEdit = false
+        if (username === null) {
+            username = "guest"
+        }
+        if (data.userPermission.includes(username)) {
+            canEdit = true
+        }
+
+        if (data.globalPermission === 'write' || canEdit) {
+            isAllowedToDraw.current = true
+        } else {
+            isAllowedToDraw.current = false
+        }
     }
 
     const loadWhiteboards = (data) => {
@@ -171,12 +197,10 @@ const Board = () => {
         whiteboardID.current = data.whiteboardID
         sessionStorage.setItem('whiteboardID', data.whiteboardID)
         window.history.replaceState(null, "New Page Title", "/"+whiteboardID.current)
+        isAllowedToDraw.current = data.permission === 'write' || data.localPermission;
+        setGlobalPermission(data.permission);
+        ownerOfWhiteboard.current = data.owner
         setViewersList(data.viewers)
-    }
-
-    const makeNewWhiteboard = () => {
-        clearWhiteboard()
-        current.emit('requestNewWhiteboard', {uniqueID: localStorage.getItem('uniqueID'), username: localStorage.getItem('username')})
     }
 
     const generateIncompleteObjects = () => {
@@ -230,51 +254,55 @@ const Board = () => {
 
     /* For starting objects via the local user */
     const handleMouseDown = (e) => {
-        if (isDragging) {
-            const clickedOnEmpty = e.target === e.target.getStage();
-            if (clickedOnEmpty) {
-                selectShape(null);
+        if (isAllowedToDraw.current) {
+            if (isDragging) {
+                const clickedOnEmpty = e.target === e.target.getStage();
+                if (clickedOnEmpty) {
+                    selectShape(null);
+                }
+            } else if (isDrawingTool) {
+                isDrawing.current = true;
+
+                if (holdingObjects.current['self'] == null) { // untested
+                    holdingObjects.current['self'] = [];
+                }
+
+                const pos = getRelativePointerPosition(group.current);
+
+                let objectID = makeID(9);
+                if (tools.current.tool === "line" || tools.current.tool === "eraser") {
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], stroke: tools.current.stroke };
+                } else if (tools.current.tool === "square") {
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke: tools.current.stroke };
+                } else if (tools.current.tool === "circle") {
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke: tools.current.stroke };
+                } else if (tools.current.tool === "text") {
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke: tools.current.stroke };
+                }
+
+                generateIncompleteObjects()
+
+                if (tools.current.tool === "text") {
+                    current.emit('objectStart', {
+                        point: pos,
+                        tool: tools.current.tool,
+                        stroke: tools.current.stroke,
+                        text: "Double click on me to change text",
+                        whiteboardID: whiteboardID.current,
+                        selectID: objectID
+                    });
+                } else {
+                    current.emit('objectStart', {
+                        point: pos,
+                        tool: tools.current.tool,
+                        stroke: tools.current.stroke,
+                        whiteboardID: whiteboardID.current,
+                        selectID: objectID
+                    });
+                }
             }
-        } else if (isDrawingTool) {
-            isDrawing.current = true;
-
-            if (holdingObjects.current['self'] == null) { // untested
-                holdingObjects.current['self'] = [];
-            }
-
-            const pos = e.target.getStage().getPointerPosition();
-
-            let objectID = makeID(9);
-            if (tools.current.tool === "line" || tools.current.tool === "eraser") {
-                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], stroke: tools.current.stroke };
-            } else if (tools.current.tool === "square") {
-                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke: tools.current.stroke };
-            } else if (tools.current.tool === "circle") {
-                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke: tools.current.stroke };
-            } else if (tools.current.tool === "text") {
-                holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke: tools.current.stroke };
-            }
-
-            generateIncompleteObjects()
-
-            if (tools.current.tool === "text") {
-                current.emit('objectStart', {
-                    point: pos,
-                    tool: tools.current.tool,
-                    stroke: tools.current.stroke,
-                    text: "Double click on me to change text",
-                    whiteboardID: whiteboardID.current,
-                    selectID: objectID
-                });
-            } else {
-                current.emit('objectStart', {
-                    point: pos,
-                    tool: tools.current.tool,
-                    stroke: tools.current.stroke,
-                    whiteboardID: whiteboardID.current,
-                    selectID: objectID
-                });
-            }
+        } else {
+            enqueueSnackbar("You are not allowed to interact with the whiteboard");
         }
     };
 
@@ -301,7 +329,7 @@ const Board = () => {
     const handleMouseMove = (e) => {
         if (!isDrawing.current) { return; }
 
-        const point = e.target.getStage().getPointerPosition();
+        const point = getRelativePointerPosition(group.current);
         drawObject(point, 'self');
 
         current.emit('drawing', {
@@ -320,7 +348,6 @@ const Board = () => {
         if (isDrawingTool) {
             isDrawing.current = false;
             let completedObject = holdingObjects.current['self'];
-            console.log(completedObject)
             if (completedObject !== []) {
                 completedObjects.push(completedObject)
                 setCompletedObjects([...completedObjects.concat()])
@@ -355,8 +382,6 @@ const Board = () => {
         completedObjects.map((testobj, i) => {
             if (testobj.selectID === data.selectID) {
                 if (data.tool === "square") {
-                    console.log({...completedObjects[i]})
-                    console.log(data)
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
                     completedObjects[i].size[0] = data.size[0]
@@ -393,61 +418,6 @@ const Board = () => {
             setCompletedObjects([...historicSnapshots.current[historyCount.current]])
             historyCount.current += 1
         }
-    }
-
-    const handleClear = () => {
-        clearWhiteboard()
-        enqueueSnackbar("Whiteboard cleared");
-        current.emit('clearWhiteboard', whiteboardID.current);
-    }
-
-    const handleUndo = () => {
-        undoWhiteboard()
-        current.emit('undoWhiteboard', whiteboardID.current);
-    }
-
-    const handleRedo = () => {
-        redoWhiteboard()
-        let latestLine = historicSnapshots.current[historyCount.current-1]
-        current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
-    }
-
-    const handleJoin = (newWhiteboardID) => {
-        clearWhiteboard()
-        current.emit('joinWhiteboard', {whiteboardID: newWhiteboardID.whiteboardID, username: localStorage.getItem('username')});
-    }
-
-    const handleLogin = (form) => {
-        let data = {
-            authentication: {
-                'user': form.username,
-                'password': form.password
-            },
-            whiteboardID: whiteboardID.current
-        }
-
-        current.emit('login', data)
-    }
-
-    const handleSignup = (form) => {
-        let data = {
-            'user': form.username,
-            'password': form.password
-        }
-
-        current.emit('signup', data)
-    }
-
-    const handleMoveObjects = () => {
-        isDragging = setIsDragging(true);
-        isDrawingTool = setIsDrawingTool(false);
-        setAnchorEl(null);
-    }
-
-    const handleStartDrawing = () => {
-        isDragging = setIsDragging(false);
-        isDrawingTool = setIsDrawingTool(true);
-        setAnchorEl(null);
     }
 
     let groupScale = useRef(1);
@@ -492,9 +462,99 @@ const Board = () => {
         stage.batchDraw();
     }
 
+    // UI Functions
+
+    const handleMoveObjects = () => {
+        if (isAllowedToDraw.current) {
+            isDragging = setIsDragging(true);
+            isDrawingTool = setIsDrawingTool(false);
+        }
+        setAnchorEl(null)
+    }
+
+    const handleStartDrawing = () => {
+        if (isAllowedToDraw.current) {
+            isDragging = setIsDragging(false);
+            isDrawingTool = setIsDrawingTool(true);
+        }
+        setAnchorEl(null);
+    }
+
+    const handleLogin = (form) => {
+        let data = {
+            authentication: {
+                'user': form.username,
+                'password': form.password
+            },
+            whiteboardID: whiteboardID.current
+        }
+
+        current.emit('login', data)
+    }
+
+    const handleSignup = (form) => {
+        let data = {
+            'user': form.username,
+            'password': form.password
+        }
+
+        current.emit('signup', data)
+    }
+
+    const signOut = () => {
+        localStorage.removeItem('uniqueID');
+        localStorage.removeItem('username')
+        setValue(value => value + 1);
+    }
+
+    const makeNewWhiteboard = () => {
+        clearWhiteboard()
+        current.emit('requestNewWhiteboard', {uniqueID: localStorage.getItem('uniqueID'), username: localStorage.getItem('username')})
+    }
+
+    const handleClear = () => {
+        clearWhiteboard()
+        enqueueSnackbar("Whiteboard cleared");
+        current.emit('clearWhiteboard', whiteboardID.current);
+    }
+
+    const handleUndo = () => {
+        undoWhiteboard()
+        current.emit('undoWhiteboard', whiteboardID.current);
+    }
+
+    const handleRedo = () => {
+        redoWhiteboard()
+        let latestLine = historicSnapshots.current[historyCount.current-1]
+        current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
+    }
+
+    const handleJoin = (newWhiteboardID) => {
+        clearWhiteboard()
+        current.emit('joinWhiteboard', {whiteboardID: newWhiteboardID.whiteboardID, username: localStorage.getItem('username')});
+    }
+
     const handleChangePermissions = (newPermission) => {
         current.emit('changeGlobalPermission', {whiteboardID: whiteboardID.current, user: localStorage.getItem('uniqueID'), newPermission: newPermission})
     }
+
+    const handleLoadWhiteboards = () => {
+        current.emit('loadWhiteboards', localStorage.getItem('uniqueID'))
+    }
+
+    const handleCreateCopy = () => {
+        current.emit('createCopy', {session: localStorage.getItem('uniqueID'), whiteboardID: whiteboardID.current, username: localStorage.getItem('username')})
+    }
+
+    const handleAllowUser = (data) => {
+        current.emit('allowUser', {whiteboardID: whiteboardID.current, username: data})
+    }
+
+    const handleBlockUser = (data) => {
+        current.emit('blockUser', {whiteboardID: whiteboardID.current, username: data})
+    }
+
+    // UI Elements
 
     const [anchorEl, setAnchorEl] = React.useState(null);
     const [anchorEl2, setAnchorEl2] = React.useState(null);
@@ -521,40 +581,21 @@ const Board = () => {
     const open2 = Boolean(anchorEl2);
     const id2 = open2 ? 'simple-popover' : undefined;
 
-    const loggedIn = (data) => {
-        localStorage.setItem('uniqueID', data.uniqueID)
-        localStorage.setItem('username', data.username)
-        setValue(value => value + 1);
-    }
-
-    const signOut = () => {
-        localStorage.removeItem('uniqueID');
-        localStorage.removeItem('username')
-        setValue(value => value + 1);
-    }
-
     function ActionBar() {
         if (localStorage.getItem('uniqueID')) {
-            return <UserActions ref={r => (loadWhiteboardsUI.current = r)} class={classes.adminButton} signOut={signOut} makeNewWhiteboard={makeNewWhiteboard} changePermissions={handleChangePermissions} loadWhiteboard={handleJoin} loadWhiteboards={handleLoadWhiteboards} />;
+            return <UserActions
+                ref={r => (loadWhiteboardsUI.current = r)}
+                class={classes.adminButton} signOut={signOut}
+                makeNewWhiteboard={makeNewWhiteboard}
+                changePermissions={handleChangePermissions}
+                loadWhiteboard={handleJoin}
+                loadWhiteboards={handleLoadWhiteboards}
+                whiteboardData={{owner: ownerOfWhiteboard.current, globalPermissions: globalPermission}}
+            />;
         } else {
             return <LoginButton class={classes.adminButton} login={handleLogin} signup={handleSignup} />;
         }
     }
-
-    const handleLoadWhiteboards = () => {
-        current.emit('loadWhiteboards', localStorage.getItem('uniqueID'))
-    }
-
-    const handleCreateCopy = () => {
-        current.emit('createCopy', {session: localStorage.getItem('uniqueID'), whiteboardID: whiteboardID.current, username: localStorage.getItem('username')})
-    }
-
-    const handleAllowUser = (data) => {
-        current.emit('allowUser', {whiteboardID: whiteboardID.current, username: data})
-    }
-
-    const handleBlockUser = (data) => {
-        current.emit('blockUser', {whiteboardID: whiteboardID.current, username: data})    }
 
     return (
         <div>
@@ -813,7 +854,6 @@ const Board = () => {
                             <ColorButton color={strokes['yellow']}/>
                         </IconButton>
                     </Tooltip>
-                    {/*<SideBarSubItem function={handleClose2} stroke={tools.current.stroke} hex={strokes['yellow']}/>*/}
                 </Popover>
                 <List component="nav">
                     <SidebarItem icon=<CreateIcon /> tooltip={"Draw"} function={handleClick} class={classes.button}/>
@@ -836,7 +876,7 @@ const Board = () => {
                 </div>
             </Container>
             <Container className={classes.viewers} style={{display: 'inline-flex'}} maxWidth={false}>
-                <ViewersList viewersList={viewersList} allowUser={handleAllowUser} blockUser={handleBlockUser()} />
+                <ViewersList viewersList={viewersList} allowUser={handleAllowUser} blockUser={handleBlockUser} />
             </Container>
         </div>
     );

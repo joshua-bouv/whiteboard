@@ -13,6 +13,7 @@ import CardActions from '@material-ui/core/CardActions';
 import CardContent from '@material-ui/core/CardContent';
 import CardMedia from '@material-ui/core/CardMedia';
 import Modal from '@material-ui/core/Modal';
+import {useSnackbar} from "notistack";
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -31,12 +32,12 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-
 const UserActions = forwardRef((props, ref) => {
     const classes = useStyles();
-    const [permissions, setPermissions] = useState('read');
+    const [permissions, setPermissions] = useState(props.whiteboardData.globalPermissions);
     const [open, setOpen] = useState(false);
     let [savedWhiteboards, setSavedWhiteboards] = useState([]);
+    const { enqueueSnackbar } = useSnackbar();
 
     useImperativeHandle(ref, () => ({
         updateSavedWhiteboards: (data) => {
@@ -59,8 +60,13 @@ const UserActions = forwardRef((props, ref) => {
     };
 
     const handleChange = (event) => {
-        setPermissions(event.target.value)
-        props.changePermissions(event.target.value)
+        console.log(props.whiteboardData.owner)
+        if (localStorage.getItem('uniqueID') === props.whiteboardData.owner) {
+            setPermissions(event.target.value)
+            props.changePermissions(event.target.value)
+        } else {
+            enqueueSnackbar("Only an owner can change global permissions of a whiteboard")
+        }
     };
 
     return (

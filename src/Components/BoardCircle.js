@@ -18,6 +18,7 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) 
     React.useEffect(() => {
         if (onCanMove) {
             if (isSelected) {
+                console.log("hu")
                 trRef.current.nodes([shapeRef.current]);
                 trRef.current.getLayer().batchDraw();
             }

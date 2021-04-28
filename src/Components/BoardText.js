@@ -13,15 +13,22 @@ const BoardText = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) =>
         fill:shapeProps.stroke,
         fontFamily:'Calibri',
         fontSize:18,
-        draggable:true,
+        draggable:onCanMove,
         listening:true,
     }
 
     React.useEffect(() => {
         if (onCanMove) {
             if (isSelected) {
+//                const node = shapeRef.current;
                 trRef.current.nodes([shapeRef.current]);
                 trRef.current.getLayer().batchDraw();
+//                let objectPosition = node.absolutePosition();
+//                let button = document.createElement('button')
+//                document.body.appendChild(button)
+//                button.style.position = 'absolute';
+//                button.style.top = objectPosition.y + 'px';
+//                button.style.left = objectPosition.x + 'px';
             }
         }
     }, [isSelected]);
@@ -33,77 +40,75 @@ const BoardText = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) =>
                 onTap={onSelect}
                 ref={shapeRef}
                 {...shapeProps}
-                draggable
                 onDblClick={(e) => {
-                    // make textarea
-                    const node = shapeRef.current;
-                    node.hide()
-                    let textPosition = node.absolutePosition();
+                    if (onCanMove) {
+                        // make textarea
+                        const node = shapeRef.current;
+                        node.hide()
+                        let textPosition = node.absolutePosition();
+                        let textarea = document.createElement('textarea');
+                        document.body.appendChild(textarea);
+                        textarea.value = node.text();
+                        textarea.style.position = 'absolute';
+                        textarea.style.top = textPosition.y + 'px';
+                        textarea.style.left = textPosition.x + 'px';
+                        textarea.style.width = node.width() - node.padding() * 2 + 'px';
+                        textarea.style.height = node.height() - node.padding() * 2 + 5 + 'px';
+                        textarea.style.fontSize = node.fontSize() + 'px';
+                        textarea.style.border = 'none';
+                        textarea.style.padding = '0px';
+                        textarea.style.margin = '0px';
+                        textarea.style.overflow = 'hidden';
+                        textarea.style.background = 'none';
+                        textarea.style.outline = 'none';
+                        textarea.style.resize = 'none';
+                        textarea.style.lineHeight = node.lineHeight();
+                        textarea.style.fontFamily = node.fontFamily();
+                        textarea.style.transformOrigin = 'left top';
+                        textarea.style.textAlign = node.align();
+                        textarea.style.color = node.fill();
+                        textarea.style.height = 'auto';
+                        textarea.style.height = textarea.scrollHeight + 3 + 'px';
+                        textarea.focus();
 
-                    var textarea = document.createElement('textarea');
-                    document.body.appendChild(textarea);
-                    textarea.value = node.text();
-                    textarea.style.position = 'absolute';
-                    textarea.style.top = textPosition.y + 'px';
-                    textarea.style.left = textPosition.x + 'px';
-                    textarea.style.width = node.width() - node.padding() * 2 + 'px';
-                    textarea.style.height = node.height() - node.padding() * 2 + 5 + 'px';
-                    textarea.style.fontSize = node.fontSize() + 'px';
-                    textarea.style.border = 'none';
-                    textarea.style.padding = '0px';
-                    textarea.style.margin = '0px';
-                    textarea.style.overflow = 'hidden';
-                    textarea.style.background = 'none';
-                    textarea.style.outline = 'none';
-                    textarea.style.resize = 'none';
-                    textarea.style.lineHeight = node.lineHeight();
-                    textarea.style.fontFamily = node.fontFamily();
-                    textarea.style.transformOrigin = 'left top';
-                    textarea.style.textAlign = node.align();
-                    textarea.style.color = node.fill();
-                    textarea.style.height = 'auto';
-                    textarea.style.height = textarea.scrollHeight + 3 + 'px';
-                    textarea.focus();
+                        function removeTextarea() {
+                            onChange({
+                                ...shapeProps,
+                                text: textarea.value
+                            });
+                            textarea.parentNode.removeChild(textarea);
+                            node.show()
 
-                    function removeTextarea() {
-                        console.log(textarea.value)
-                        onChange({
-                            ...shapeProps,
-                            text: textarea.value
+                            window.removeEventListener('click', handleOutsideClick);
+                        }
+
+                        function handleOutsideClick(e) {
+                            if (e.target !== textarea) {
+                                removeTextarea();
+                            }
+                        }
+
+                        textarea.addEventListener('keydown', function (e) {
+                            // hide on enter
+                            // but don't hide on shift + enter
+                            if (e.keyCode === 13 && !e.shiftKey) {
+                                removeTextarea();
+                            }
+                            // on esc do not set value back to node
+                            if (e.keyCode === 27) {
+                                removeTextarea();
+                            }
                         });
-                        textarea.parentNode.removeChild(textarea);
-                        node.show()
 
-                        window.removeEventListener('click', handleOutsideClick);
+                        setTimeout(() => {
+                            window.addEventListener('click', handleOutsideClick);
+                        });
                     }
-
-                    function handleOutsideClick(e) {
-                        if (e.target !== textarea) {
-                            removeTextarea();
-                        }
-                    }
-
-                    textarea.addEventListener('keydown', function (e) {
-                        // hide on enter
-                        // but don't hide on shift + enter
-                        if (e.keyCode === 13 && !e.shiftKey) {
-                            removeTextarea();
-                        }
-                        // on esc do not set value back to node
-                        if (e.keyCode === 27) {
-                            removeTextarea();
-                        }
-                    });
-
-                    setTimeout(() => {
-                        window.addEventListener('click', handleOutsideClick);
-                    });
-
-                    console.log("double click detected")
                 }}
                 onDblTap={(e) => {
                     console.log("double tap detected")
                 }}
+
                 onDragEnd={(e) => {
                     onChange({
                         ...shapeProps,
