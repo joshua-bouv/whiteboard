@@ -35,6 +35,25 @@ function ViewersList(props) {
         setOpen(false);
     };
 
+    const shouldHaveAdminTools = (user) => {
+        if (props.ownerOfWhiteboard === localStorage.getItem('uniqueID')) {
+            return (
+                <div style={{display: 'inline-flex', width: '250px', right: '0', justifyContent: 'flex-end'}}>
+                    <Tooltip title="Block access">
+                        <IconButton onClick={() => {props.blockUser(user)}}>
+                            <BlockIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Give access">
+                        <IconButton onClick={() => {props.allowUser(user)}}>
+                            <CreateIcon />
+                        </IconButton>
+                    </Tooltip>
+                </div>
+            )
+        }
+    }
+
     return (
         <ClickAwayListener onClickAway={handleClickAway}>
             <div className={classes.root}>
@@ -49,16 +68,7 @@ function ViewersList(props) {
                                     <Typography style={{width: 'inherit', alignSelf: 'center'}}>
                                         {object}
                                     </Typography>
-                                    <Tooltip title="Block access">
-                                        <IconButton onClick={() => {props.blockUser(object)}}>
-                                            <BlockIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Give access">
-                                        <IconButton onClick={() => {props.allowUser(object)}}>
-                                            <CreateIcon />
-                                        </IconButton>
-                                    </Tooltip>
+                                    {shouldHaveAdminTools(object)}
                                 </div>
                             )
                         })}

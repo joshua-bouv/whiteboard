@@ -1,17 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Rect, Circle, Group } from 'react-konva';
+import io from "socket.io-client";
+import { useSnackbar } from 'notistack';
 
-import BoardRectangle from './Components/BoardRectangle'
-import BoardCircle from './Components/BoardCircle'
 import { makeStyles } from '@material-ui/core/styles';
+import '../styles/board.css';
+import { SvgIcon, Tooltip } from "@material-ui/core";
 
 import Container from '@material-ui/core/Container';
 import List from '@material-ui/core/List';
 import IconButton from '@material-ui/core/IconButton';
 import Popover from '@material-ui/core/Popover';
-
+import Button from "@material-ui/core/Button";
 import {ColorButton} from 'material-ui-color';
-
 
 import CreateIcon from '@material-ui/icons/Create';
 import PaletteIcon from '@material-ui/icons/Palette';
@@ -23,23 +24,21 @@ import GestureIcon from '@material-ui/icons/Gesture';
 import CheckBoxOutlineBlankIcon from '@material-ui/icons/CheckBoxOutlineBlank';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import TitleIcon from '@material-ui/icons/Title';
-import { useSnackbar } from 'notistack';
 
-import SidebarItem from './UI/SidebarItem'
+import LoginButton from "./Login";
+import UserActions from "./UserActions";
+import JoinButton from "./JoinWhiteboard";
+import SidebarItem from './SidebarItem'
+import ViewersList from "./ViewersList";
 
-import './styles/board.css';
-import io from "socket.io-client";
-import LoginButton from "./UI/Login";
-import UserActions from "./UI/UserActions";
-import JoinButton from "./UI/JoinWhiteboard";
-import BoardText from "./Components/BoardText";
-import {SvgIcon, Tooltip} from "@material-ui/core";
-import Button from "@material-ui/core/Button";
-import ViewersList from "./UI/ViewersList";
+import BoardText from "../Components/BoardText";
+import BoardRectangle from '../Components/BoardRectangle'
+import BoardCircle from '../Components/BoardCircle'
 
 let current = io.connect(':8080/');
 let sessionWhiteboardID = sessionStorage.getItem('whiteboardID')
 let urlWhiteboardID = window.location.pathname.substring(1)
+
 if (urlWhiteboardID !== "") {
     console.log("Joining whiteboard from URL")
     current.emit('joinWhiteboard', {whiteboardID: urlWhiteboardID, username: localStorage.getItem('username')})
@@ -51,7 +50,7 @@ if (urlWhiteboardID !== "") {
     current.emit('requestNewWhiteboard', {uniqueID: localStorage.getItem('uniqueID'), username: localStorage.getItem('username')})
 }
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(() => ({
     root: {
         position: 'absolute',
         top: 0,
@@ -93,27 +92,27 @@ const Board = () => {
         stroke: '#000000',
     })
 
-    let [incompleteObjects, setIncompleteObjects] = useState([]);
-    let [completedObjects, setCompletedObjects] = useState([]);
-    const [value, setValue] = useState(0); // for forcing refreshes
-    let holdingObjects = useRef([]);
-    let historicSnapshots = useRef([]);
-    let historyCount = useRef(0);
-    let whiteboardID = useRef("");
-    let [viewersList, setViewersList] = useState([]);
-    const outer = useRef(null);
-    const group = useRef(null)
-    const group2 = useRef(null)
-    const isDrawing = useRef(false);
-    const loadWhiteboardsUI = useRef(null);
-    const isAllowedToDraw = useRef(false);
-    let [globalPermission, setGlobalPermission] = useState('read');
-    const ownerOfWhiteboard = useRef(false);
-    const classes = useStyles();
-    const { enqueueSnackbar } = useSnackbar();
+    let [incompleteObjects, setIncompleteObjects] = useState([]);  // for in-complete objects
+    let [completedObjects, setCompletedObjects] = useState([]);  // for completed objects
+    let [isDragging, setIsDragging] = useState(false);  // for if the dragging tool is enabled
+    let [isDrawingTool, setIsDrawingTool] = useState(false);  // for if the drawing tool is anbled
+    let [globalPermission, setGlobalPermission] = useState('read');  // the global permission of a whiteboard
+    let [viewersList, setViewersList] = useState([]);  // the viewers list of a whiteboard
+    const [_, forceRefresh] = useState(0); // for forcing refreshes
 
-    let [isDragging, setIsDragging] = useState(false);
-    let [isDrawingTool, setIsDrawingTool] = useState(false);
+    const { enqueueSnackbar } = useSnackbar(); // for notifications
+
+    let holdingObjects = useRef([]);  // for temporary storage of an object
+    let historicSnapshots = useRef([]);  // for older versions of the whiteboard
+    let historyCount = useRef(0);  // for the steps made in a whiteboard
+    let whiteboardID = useRef("");  // the whiteboard ID
+    const group = useRef(null);  // for tracking the zoom/position of the whiteboard
+    const isDrawing = useRef(false);  // for if mouse has been pressed whilst drawing tool enabled
+    const loadWhiteboardsUI = useRef(null);  // the load whiteboard UI component
+    const isAllowedToDraw = useRef(false); // local permission
+    const ownerOfWhiteboard = useRef(false);  // owner of whiteboard
+
+    const classes = useStyles();
 
     const strokes = {
         'black': '#000000',
@@ -143,6 +142,7 @@ const Board = () => {
         current.on('objectEnd', handleSocketUp);
         current.on('streamObject', handleStreamObject);
         current.on('updateObject', handleUpdateObject);
+        current.on('deleteObject', handleDeleteObject)
         current.on('clearWhiteboard', clearWhiteboard);
         current.on('undoWhiteboard', undoWhiteboard);
         current.on('redoWhiteboard', redoWhiteboard);
@@ -165,24 +165,22 @@ const Board = () => {
     const loggedIn = (data) => {
         localStorage.setItem('uniqueID', data.uniqueID)
         localStorage.setItem('username', data.username)
-        setValue(value => value + 1);
+        forceRefresh(value => value + 1);
     }
 
     const permissionChanged = (data) => {
         let username = localStorage.getItem('username')
         let canEdit = false
+
         if (username === null) {
             username = "guest"
         }
+
         if (data.userPermission.includes(username)) {
             canEdit = true
         }
 
-        if (data.globalPermission === 'write' || canEdit) {
-            isAllowedToDraw.current = true
-        } else {
-            isAllowedToDraw.current = false
-        }
+        isAllowedToDraw.current = data.globalPermission === 'write' || canEdit;
     }
 
     const loadWhiteboards = (data) => {
@@ -200,7 +198,6 @@ const Board = () => {
         isAllowedToDraw.current = data.permission === 'write' || data.localPermission;
         setGlobalPermission(data.permission);
         ownerOfWhiteboard.current = data.owner
-        setViewersList(data.viewers)
     }
 
     const generateIncompleteObjects = () => {
@@ -225,7 +222,7 @@ const Board = () => {
 
         if (inUseTool === "line" || inUseTool === "eraser") {
             lastObject.points = lastObject.points.concat([point.x, point.y]); // adds the new plots into the points array
-        } else if (inUseTool === "square") { // potentially other objects
+        } else if (inUseTool === "square") {
             let x = point.x - lastObject.points[0];
             let y = point.y - lastObject.points[1];
             lastObject.size = [x, y]; // update size of object
@@ -245,7 +242,7 @@ const Board = () => {
             }
         }
 
-        if (tools.current.tool !== "text") {
+        if (tools.current.tool !== "text") {  // text doesn't need a re-render
             generateIncompleteObjects();
         }
     };
@@ -326,7 +323,7 @@ const Board = () => {
     };
 
     /* For drawing objects via the local user */
-    const handleMouseMove = (e) => {
+    const handleMouseMove = () => {
         if (!isDrawing.current) { return; }
 
         const point = getRelativePointerPosition(group.current);
@@ -355,9 +352,9 @@ const Board = () => {
                 current.emit('objectEnd', {whiteboardID:whiteboardID.current, object: completedObject, image: stage.toDataURL({pixelRatio: 0.1})});
                 holdingObjects.current['self'] = [];
             }
+            generateHistoryStep()
         }
         generateIncompleteObjects()
-        generateHistoryStep() // probs needs moving
     };
 
     /* For ending objects via an external user */
@@ -371,7 +368,6 @@ const Board = () => {
 
     /* For streaming objects from the database */
     const handleStreamObject = (data) => {
-//        data.selectID = data._id
         completedObjects.push({...data})
         setTimeout(function(){ setCompletedObjects([...completedObjects.concat()]); }, 10);
         generateHistoryStep()
@@ -379,8 +375,8 @@ const Board = () => {
 
     /* For streaming objects from the database */
     const handleUpdateObject = (data) => {
-        completedObjects.map((testobj, i) => {
-            if (testobj.selectID === data.selectID) {
+        completedObjects.map((object, i) => {
+            if (object.selectID === data.selectID) {
                 if (data.tool === "square") {
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
@@ -397,6 +393,12 @@ const Board = () => {
                 }
             }
         });
+        setCompletedObjects([...completedObjects.concat()]);
+        generateHistoryStep()
+    }
+
+    const handleDeleteObject = (data) => {
+        completedObjects = completedObjects.filter(object => object.selectID !== data);
         setCompletedObjects([...completedObjects.concat()]);
         generateHistoryStep()
     }
@@ -420,20 +422,15 @@ const Board = () => {
         }
     }
 
+
+    /* https://konvajs.org/docs/sandbox/Relative_Pointer_Position.html#page-title */
     let groupScale = useRef(1);
     let groupPosX = useRef(0);
     let groupPosY = useRef(0);
 
     function getRelativePointerPosition(node) {
-        var transform = node.getAbsoluteTransform().copy();
-        // to detect relative position we need to invert transform
-        transform.invert();
-
-        // get pointer (say mouse or touch) position
-        var pos = node.getStage().getPointerPosition();
-
-        // now we can find relative point
-        return transform.point(pos);
+        const transform = node.getAbsoluteTransform().copy().invert();
+        return transform.point(node.getStage().getPointerPosition());
     }
 
     let scaleBy = 0.95;
@@ -448,18 +445,14 @@ const Board = () => {
 
         let newScale = e.evt.deltaY > 0 ? oldScale * scaleBy : oldScale / scaleBy;
         groupScale.current = newScale;
-        //stage.scale({ x: newScale, y: newScale });
         let newPos = {
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale,
         };
         groupPosX.current = newPos.x;
         groupPosY.current = newPos.y;
-        //stage.position(newPos);
 
-        setValue(value => value + 1);
-
-        stage.batchDraw();
+        forceRefresh(value => value + 1); // Forces a refresh
     }
 
     // UI Functions
@@ -504,7 +497,7 @@ const Board = () => {
     const signOut = () => {
         localStorage.removeItem('uniqueID');
         localStorage.removeItem('username')
-        setValue(value => value + 1);
+        forceRefresh(value => value + 1);
     }
 
     const makeNewWhiteboard = () => {
@@ -575,6 +568,14 @@ const Board = () => {
         setAnchorEl2(null);
     };
 
+    const handleKeyPressed = (data) => {
+        if (data.key === "Delete") {
+            if (selectedId !== null) {
+                current.emit('deleteObject', {whiteboardID: whiteboardID.current, _id: selectedId})
+            }
+        }
+    }
+
     const open = Boolean(anchorEl);
     const id = open ? 'simple-popover' : undefined;
 
@@ -598,7 +599,7 @@ const Board = () => {
     }
 
     return (
-        <div>
+        <div tabIndex={1} onKeyDown={handleKeyPressed} style={{'outline': 'none'}}>
             <Stage
                 width={window.innerWidth}
                 height={window.innerHeight}
@@ -609,7 +610,6 @@ const Board = () => {
                 onWheel={handleMouseWheel}
             >
                 <Layer
-                    ref={outer}
                     listening={true}
                 >
                     <Group
@@ -646,13 +646,14 @@ const Board = () => {
                                             selectShape(object.selectID);
                                         }}
                                         onChange={(newAttrs) => {
-                                            completedObjects.map((testobj, i) => {
-                                                if (testobj.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
+                                            completedObjects.map((object, i) => {
+                                                if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].size[0] = newAttrs.width
                                                     completedObjects[i].size[1] = newAttrs.height
                                                     current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
+                                                    generateHistoryStep()
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -670,12 +671,13 @@ const Board = () => {
                                             selectShape(object.selectID);
                                         }}
                                         onChange={(newAttrs) => {
-                                            completedObjects.map((testobj, i) => {
-                                                if (testobj.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
+                                            completedObjects.map((object, i) => {
+                                                if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].radius = newAttrs.radius
                                                     current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
+                                                    generateHistoryStep()
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -693,12 +695,13 @@ const Board = () => {
                                             selectShape(object.selectID);
                                         }}
                                         onChange={(newAttrs) => {
-                                            completedObjects.map((testobj, i) => {
-                                                if (testobj.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
+                                            completedObjects.map((object, i) => {
+                                                if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].text = newAttrs.text
                                                     current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
+                                                    generateHistoryStep()
                                                 }
                                             });
                                             setCompletedObjects([...completedObjects.concat()])
@@ -876,7 +879,7 @@ const Board = () => {
                 </div>
             </Container>
             <Container className={classes.viewers} style={{display: 'inline-flex'}} maxWidth={false}>
-                <ViewersList viewersList={viewersList} allowUser={handleAllowUser} blockUser={handleBlockUser} />
+                <ViewersList viewersList={viewersList} ownerOfWhiteboard={ownerOfWhiteboard.current} allowUser={handleAllowUser} blockUser={handleBlockUser} />
             </Container>
         </div>
     );

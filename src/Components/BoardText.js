@@ -20,15 +20,8 @@ const BoardText = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) =>
     React.useEffect(() => {
         if (onCanMove) {
             if (isSelected) {
-//                const node = shapeRef.current;
                 trRef.current.nodes([shapeRef.current]);
                 trRef.current.getLayer().batchDraw();
-//                let objectPosition = node.absolutePosition();
-//                let button = document.createElement('button')
-//                document.body.appendChild(button)
-//                button.style.position = 'absolute';
-//                button.style.top = objectPosition.y + 'px';
-//                button.style.left = objectPosition.x + 'px';
             }
         }
     }, [isSelected]);

@@ -18,7 +18,6 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) 
     React.useEffect(() => {
         if (onCanMove) {
             if (isSelected) {
-                console.log("hu")
                 trRef.current.nodes([shapeRef.current]);
                 trRef.current.getLayer().batchDraw();
             }
@@ -40,7 +39,7 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) 
                         y: e.target.y(),
                     });
                 }}
-                onTransformEnd={(e) => {
+                onTransformEnd={() => {
                     const node = shapeRef.current;
                     const scaleX = node.scaleX();
                     node.scaleX(1);

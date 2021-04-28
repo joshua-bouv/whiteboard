@@ -83,6 +83,14 @@ async function main(){
             }
         }
 
+        async function deleteObjectOnBoard(board, id) {
+            try {
+                await whiteboards.collection(board).findOneAndDelete({selectID: id})
+            } catch {
+
+            }
+        }
+
         async function clearBoard(board) {
             try {
                 await whiteboards.collection(board).deleteMany({});
@@ -247,12 +255,13 @@ async function main(){
 
                     socketCurrentBoard[socket.id] = {whiteboardID: whiteboardID, username: username}
                     socket.join(whiteboardID);
-                    socket.to(whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                     let canDraw = false;
                     if (data.writers.includes(username)) {
                         canDraw = true;
                     }
-                    socket.emit('setupWhiteboard', {whiteboardID: whiteboardID, owner:data.owner, viewers: getUsersViewingWhiteboard(whiteboardID), permission: data.permission, localPermission: canDraw})
+                    socket.emit('setupWhiteboard', {whiteboardID: whiteboardID, owner:data.owner, permission: data.permission, localPermission: canDraw})
+                    socket.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
+                    socket.to(whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                     console.log(username+" connected to whiteboard "+whiteboardID)
                 })
             }
@@ -260,8 +269,8 @@ async function main(){
             function makeNewWhiteboard(userID) {
                 let newWhiteboard = makeID(9);
                 whiteboards.createCollection(newWhiteboard);
-                storage.collection("permissions").insertOne({name: newWhiteboard, permission: 'read', owner: userID, writers: [], snapshot: null});
-
+                storage.collection("permissions").insertOne({name: newWhiteboard, permission: 'write', owner: userID, writers: [], snapshot: null});
+                console.log("New whiteboard created", newWhiteboard)
                 return newWhiteboard
             }
 
@@ -334,6 +343,13 @@ async function main(){
             socket.on('updateObject', (data) => {
                 updateObjectOnBoard(data.whiteboardID, data.object)
                 socket.to(data.whiteboardID).broadcast.emit('updateObject', data.object);
+            });
+
+            // To delete an object on the whiteboard
+            socket.on('deleteObject', (data) => {
+                deleteObjectOnBoard(data.whiteboardID, data._id)
+                socket.emit('deleteObject', data._id);
+                socket.to(data.whiteboardID).broadcast.emit('deleteObject', data._id);
             });
 
             // To clear whiteboard across all clients
