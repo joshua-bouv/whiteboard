@@ -1,6 +1,9 @@
 # Collaborative whiteboard website
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Technical documentation
+Technical documentation found [here](https://cseegit.essex.ac.uk/ce301_2020/ce301_bouvier_joshua_l_j/-/wikis/home)
+
 ## Prerequisites
 * Node.js v21.16.1
 * npm (or yarn) v6.13.4

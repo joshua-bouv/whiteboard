@@ -115,17 +115,17 @@ async function main(){
             }
         }
 
-        async function register(username) {
+        async function register(data) {
             try {
                 let uniqueUser = true
-                await storage.collection("users").findOne({user: username}).then(results => {
+                await storage.collection("users").findOne({user: data.user}).then(results => {
                     if (results) {
                         uniqueUser = false
                     }
                 })
 
                 if (uniqueUser) {
-                    await storage.collection("users").insertOne(username);
+                    await storage.collection("users").insertOne(data);
                 }
             } catch (e) {
                 console.error("Error registering user")
@@ -189,14 +189,29 @@ async function main(){
         let socketCurrentBoard = {}
 
         io.on('connection', socket => {
+            function getUsersViewingWhiteboard(whiteboardID) {
+                let users = []
+                Object.values(socketCurrentBoard).forEach(data => {
+                    if (data !== null) {
+                        if (data.whiteboardID === whiteboardID) {
+                            if (!users.includes(data.username)) {
+                                users.push(data.username)
+                            }
+                        }
+                    }
+                });
+
+                return users;
+            }
+
             function addUser(whiteboardID, username) {
+                socket.leaveAll();
                 if (username === null) {
                     username = "guest"
                 }
-                socket.leaveAll();
                 socketCurrentBoard[socket.id] = {whiteboardID: whiteboardID, username: username}
                 socket.join(whiteboardID);
-
+                socket.to(whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                 console.log(username+" connected to whiteboard "+whiteboardID)
             }
 
@@ -210,19 +225,23 @@ async function main(){
 
             socket.on('disconnect', () => {
                 if (socketCurrentBoard[socket.id] != null) {
-                    console.log(socketCurrentBoard[socket.id].username + " disconnected form whiteboard "+socketCurrentBoard[socket.id].whiteboardID)
+                    let whiteboardID = socketCurrentBoard[socket.id].whiteboardID
+                    console.log(socketCurrentBoard[socket.id].username + " disconnected form whiteboard "+whiteboardID)
                     socketCurrentBoard[socket.id] = null
+                    socket.to(whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                 }
             })
 
             // To login to website
             socket.on('login', (data) => {
                 // escape stuff
-                login(data, function(isLoggedIn) {
+                login(data.authentication, function(isLoggedIn) {
                     if (isLoggedIn) {
-                        socket.emit('loggedIn', {uniqueID: isLoggedIn, username: data.user})
-                        socket.emit('displayNotification', "Hi "+data.user)
-                        console.error("Logging in user "+data.user)
+                        socket.emit('loggedIn', {uniqueID: isLoggedIn, username: data.authentication.user})
+                        socket.emit('displayNotification', "Hi "+data.authentication.user)
+                        console.error("Logging in user "+data.authentication.user)
+                        socketCurrentBoard[socket.id].username = data.authentication.user
+                        socket.to(data.whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(data.whiteboardID));
                     } else {
                         socket.emit('displayNotification', "Incorrect username/password")
                         console.error("User not found / wrong password")
@@ -232,21 +251,21 @@ async function main(){
 
             // To signup to website
             socket.on('signup', (data) => {
-                register(data.user)
+                register(data)
             });
 
             // To request a unique whiteboard
             socket.on('requestNewWhiteboard', (data) => {
                 let newWhiteboardID = makeNewWhiteboard(data.uniqueID)
                 addUser(newWhiteboardID, data.username)
-                socket.emit('setupWhiteboard', newWhiteboardID)
+                socket.emit('setupWhiteboard', {whiteboardID: newWhiteboardID, viewers: getUsersViewingWhiteboard(newWhiteboardID)})
             });
 
             // To join a whiteboard
             socket.on('joinWhiteboard', (data) => {
                 addUser(data.whiteboardID, data.username)
                 sendWhiteboardToClient(data.whiteboardID, socket)
-                socket.emit('setupWhiteboard', data.whiteboardID)
+                socket.emit('setupWhiteboard', {whiteboardID: data.whiteboardID, viewers: getUsersViewingWhiteboard(data.whiteboardID)})
                 socket.emit('displayNotification', "Joined whiteboard "+data.whiteboardID)
             });
 
@@ -314,17 +333,31 @@ async function main(){
                 socket.emit('displayNotification', "Permissions changed to "+text)
             })
 
+            // To allow a user edit on a whiteboard
+            socket.on('allowUser', (data) => {
+                // call to DB
+            })
+
+            // To block a user editing on a whiteboard
+            socket.on('blockUser', (data) => {
+                // call to DB
+            })
+
             socket.on('createCopy', (data) => {
                 let copyWhiteboardID = makeNewWhiteboard(data.session)
                 createCopyOfBoard(data.whiteboardID, copyWhiteboardID)
                 addUser(copyWhiteboardID, data.username)
                 sendWhiteboardToClient(copyWhiteboardID, socket)
-                socket.emit('setupWhiteboard', copyWhiteboardID)
+                socket.emit('setupWhiteboard', {whiteboardID: copyWhiteboardID, viewers: getUsersViewingWhiteboard(copyWhiteboardID)})
                 socket.emit('displayNotification', "Joined whiteboard "+copyWhiteboardID)
             })
         });
 
-        http.listen(8080,() => console.error(`!!!!! Whiteboard server active !!!!!`));
+        http.listen(8080,() => {
+            console.log(`####################################`)
+            console.log(`##### Whiteboard server active #####`)
+            console.log(`####################################`)
+        });
     } catch (e) {
         console.error("General error")
         console.error(e);

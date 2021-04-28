@@ -34,8 +34,8 @@ const useStyles = makeStyles((theme) => ({
 
 const UserActions = forwardRef((props, ref) => {
     const classes = useStyles();
-    const [permissions, setPermissions] = React.useState('read');
-    const [open, setOpen] = React.useState(false);
+    const [permissions, setPermissions] = useState('read');
+    const [open, setOpen] = useState(false);
     let [savedWhiteboards, setSavedWhiteboards] = useState([]);
 
     useImperativeHandle(ref, () => ({

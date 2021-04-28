@@ -36,6 +36,7 @@ import JoinButton from "./UI/JoinWhiteboard";
 import BoardText from "./Components/BoardText";
 import {SvgIcon, Tooltip} from "@material-ui/core";
 import Button from "@material-ui/core/Button";
+import ViewersList from "./UI/ViewersList";
 
 let current = io.connect(':8080/');
 let sessionWhiteboardID = sessionStorage.getItem('whiteboardID')
@@ -68,6 +69,14 @@ const useStyles = makeStyles((theme) => ({
         paddingLeft: 0,
         paddingRight: 0,
     },
+    viewers: {
+        position: 'absolute',
+        bottom: 10,
+        right: 10,
+        width: 'auto',
+        paddingLeft: 0,
+        paddingRight: 0,
+    },
     button: {
         paddingTop: 2,
         paddingBottom: 2,
@@ -92,6 +101,7 @@ const Board = () => {
     let historicSnapshots = useRef([]);
     let historyCount = useRef(0);
     let whiteboardID = useRef("");
+    let [viewersList, setViewersList] = useState([]);
     const outer = useRef(null);
     const group = useRef(null)
     const group2 = useRef(null)
@@ -138,11 +148,16 @@ const Board = () => {
         current.on('setupWhiteboard', setupWhiteboard);
         current.on('displayNotification', displayNotification);
         current.on('loadWhiteboards', loadWhiteboards);
+        current.on('viewersChanged', viewersChanged);
 
         return () => {
             current.off();
         }
     });
+
+    const viewersChanged = (data) => {
+        setViewersList(data)
+    }
 
     const loadWhiteboards = (data) => {
         loadWhiteboardsUI.current.updateSavedWhiteboards(data)
@@ -153,9 +168,10 @@ const Board = () => {
     }
 
     const setupWhiteboard = (data) => {
-        whiteboardID.current = data
-        sessionStorage.setItem('whiteboardID', data)
+        whiteboardID.current = data.whiteboardID
+        sessionStorage.setItem('whiteboardID', data.whiteboardID)
         window.history.replaceState(null, "New Page Title", "/"+whiteboardID.current)
+        setViewersList(data.viewers)
     }
 
     const makeNewWhiteboard = () => {
@@ -403,8 +419,11 @@ const Board = () => {
 
     const handleLogin = (form) => {
         let data = {
-            'user': form.username,
-            'password': form.password
+            authentication: {
+                'user': form.username,
+                'password': form.password
+            },
+            whiteboardID: whiteboardID.current
         }
 
         current.emit('login', data)
@@ -447,7 +466,7 @@ const Board = () => {
         return transform.point(pos);
     }
 
-    var scaleBy = 0.95;
+    let scaleBy = 0.95;
     const handleMouseWheel = (e) => {
         let stage = e.target.getStage()
         let oldScale = groupScale.current;
@@ -529,6 +548,13 @@ const Board = () => {
     const handleCreateCopy = () => {
         current.emit('createCopy', {session: localStorage.getItem('uniqueID'), whiteboardID: whiteboardID.current, username: localStorage.getItem('username')})
     }
+
+    const handleAllowUser = (data) => {
+        current.emit('allowUser', {whiteboardID: whiteboardID.current, username: data})
+    }
+
+    const handleBlockUser = (data) => {
+        current.emit('blockUser', {whiteboardID: whiteboardID.current, username: data})    }
 
     return (
         <div>
@@ -808,6 +834,9 @@ const Board = () => {
                 <div>
                     <JoinButton class={classes.adminButton} join={handleJoin} />
                 </div>
+            </Container>
+            <Container className={classes.viewers} style={{display: 'inline-flex'}} maxWidth={false}>
+                <ViewersList viewersList={viewersList} allowUser={handleAllowUser} blockUser={handleBlockUser()} />
             </Container>
         </div>
     );
