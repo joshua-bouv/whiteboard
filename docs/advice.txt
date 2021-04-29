@@ -1,0 +1,5 @@
+add captions to tables
+number sections
+add sub sectiosn for months
+add biblography
+appendicies

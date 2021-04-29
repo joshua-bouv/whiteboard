@@ -11,6 +11,8 @@ const ObjectId = require('mongodb').ObjectID;
 
 async function main(){
     const client = new MongoClient("mongodb+srv://whiteboard:siEuqzAie1kGjgi8@cluster0.nlqhr.mongodb.net/whiteboards?retryWrites=true&w=majority");
+    let socketCurrentBoard = {}
+    let activeWhiteboards = {}
 
     try {
         await client.connect();
@@ -71,9 +73,9 @@ async function main(){
         async function updateObjectOnBoard(board, data) {
             try {
                 if (data.tool === "square") {
-                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, size: data.size}})
+                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, rotation: data.rotation, size: data.size}})
                 } else if (data.tool === "circle") { // circle
-                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, radius: data.radius}})
+                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, rotation: data.rotation, radius: data.radius}})
                 } else if (data.tool === "text") {
                     await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {text: data.text}})
                 }
@@ -222,7 +224,22 @@ async function main(){
             }
         }
 
-        let socketCurrentBoard = {}
+        async function createWhiteboard(whiteboardID, user, callback) {
+            try {
+                await whiteboards.createCollection(whiteboardID);
+                await storage.collection("permissions").insertOne({name: whiteboardID, permission: 'write', owner: user, writers: [], snapshot: null}, function(err, response) {
+                    if (err) {
+                        console.error(err)
+                    } else {
+                        console.log("New whiteboard created", whiteboardID)
+                        return callback(true)
+                    }
+                });
+            } catch (e) {
+                console.error("Error removing permission from user")
+                console.error(e)
+            }
+        }
 
         io.on('connection', socket => {
             function getUsersViewingWhiteboard(whiteboardID) {
@@ -240,8 +257,6 @@ async function main(){
                 return users;
             }
 
-            let activeWhiteboards = {}
-
             function addUser(whiteboardID, username) {
                 getWhiteboardData(whiteboardID, function(data) {
                     socket.leaveAll();
@@ -252,26 +267,18 @@ async function main(){
                     if (activeWhiteboards[whiteboardID] === undefined) {
                         activeWhiteboards[whiteboardID] = {globalPermission: data.permission, owner: data.owner, userPermission: data.writers}
                     }
-
                     socketCurrentBoard[socket.id] = {whiteboardID: whiteboardID, username: username}
                     socket.join(whiteboardID);
                     let canDraw = false;
                     if (data.writers.includes(username)) {
                         canDraw = true;
                     }
-                    socket.emit('setupWhiteboard', {whiteboardID: whiteboardID, owner:data.owner, permission: data.permission, localPermission: canDraw})
+                    let test = {whiteboardID: whiteboardID, owner:data.owner, permission: data.permission, localPermission: canDraw}
+                    socket.emit('setupWhiteboard', test)
                     socket.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                     socket.to(whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                     console.log(username+" connected to whiteboard "+whiteboardID)
                 })
-            }
-
-            function makeNewWhiteboard(userID) {
-                let newWhiteboard = makeID(9);
-                whiteboards.createCollection(newWhiteboard);
-                storage.collection("permissions").insertOne({name: newWhiteboard, permission: 'write', owner: userID, writers: [], snapshot: null});
-                console.log("New whiteboard created", newWhiteboard)
-                return newWhiteboard
             }
 
             socket.on('disconnect', () => {
@@ -307,8 +314,10 @@ async function main(){
 
             // To request a unique whiteboard
             socket.on('requestNewWhiteboard', (data) => {
-                let newWhiteboardID = makeNewWhiteboard(data.uniqueID)
-                addUser(newWhiteboardID, data.username)
+                let newWhiteboard = makeID(9);
+                createWhiteboard(newWhiteboard, data.uniqueID, function() {
+                    addUser(newWhiteboard, data.username)
+                })
             });
 
             // To join a whiteboard
@@ -410,11 +419,13 @@ async function main(){
             })
 
             socket.on('createCopy', (data) => {
-                let copyWhiteboardID = makeNewWhiteboard(data.session)
-                createCopyOfBoard(data.whiteboardID, copyWhiteboardID)
-                addUser(copyWhiteboardID, data.username)
-                sendWhiteboardToClient(copyWhiteboardID, socket)
-                socket.emit('displayNotification', "Joined whiteboard "+copyWhiteboardID)
+                let copyWhiteboardID = makeID(9);
+                createWhiteboard(copyWhiteboardID, data.uniqueID, function() {
+                    createCopyOfBoard(data.whiteboardID, copyWhiteboardID)
+                    addUser(copyWhiteboardID, data.username)
+                    sendWhiteboardToClient(copyWhiteboardID, socket)
+                    socket.emit('displayNotification', "Joined whiteboard "+copyWhiteboardID)
+                })
             })
         });
 

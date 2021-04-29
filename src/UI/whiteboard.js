@@ -270,11 +270,11 @@ const Board = () => {
                 if (tools.current.tool === "line" || tools.current.tool === "eraser") {
                     holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], stroke: tools.current.stroke };
                 } else if (tools.current.tool === "square") {
-                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], size: [0, 0], stroke: tools.current.stroke };
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], rotation: 0, size: [0, 0], stroke: tools.current.stroke };
                 } else if (tools.current.tool === "circle") {
-                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], radius: 0, stroke: tools.current.stroke };
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], rotation: 0, radius: 0, stroke: tools.current.stroke };
                 } else if (tools.current.tool === "text") {
-                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], text: "Double click on me to change text", stroke: tools.current.stroke };
+                    holdingObjects.current['self'] = { selectID: objectID, tool: tools.current.tool, points: [pos.x, pos.y], rotation: 0, text: "Double click on me to change text", stroke: tools.current.stroke };
                 }
 
                 generateIncompleteObjects()
@@ -282,6 +282,7 @@ const Board = () => {
                 if (tools.current.tool === "text") {
                     current.emit('objectStart', {
                         point: pos,
+                        rotation: 0,
                         tool: tools.current.tool,
                         stroke: tools.current.stroke,
                         text: "Double click on me to change text",
@@ -291,6 +292,7 @@ const Board = () => {
                 } else {
                     current.emit('objectStart', {
                         point: pos,
+                        rotation: 0,
                         tool: tools.current.tool,
                         stroke: tools.current.stroke,
                         whiteboardID: whiteboardID.current,
@@ -314,11 +316,11 @@ const Board = () => {
         if (data.tool === "line" || data.tool === "eraser") {
             holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], stroke: data.stroke };
         } else if (data.tool === "square") {
-            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], size: [0, 0], stroke: data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], rotation: data.rotation, size: [0, 0], stroke: data.stroke };
         } else if (data.tool === "circle") {
-            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], radius: 0, stroke: data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], rotation: data.rotation, radius: 0, stroke: data.stroke };
         } else if (data.tool === "text") {
-            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], text: data.text, stroke: data.stroke };
+            holdingObjects.current[data.user] = { selectID: data.selectID, tool: data.tool, points: [pos.x, pos.y], rotation: data.rotation, text: data.text, stroke: data.stroke };
         }
     };
 
@@ -380,15 +382,18 @@ const Board = () => {
                 if (data.tool === "square") {
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
+                    completedObjects[i].rotation = data.rotation
                     completedObjects[i].size[0] = data.size[0]
                     completedObjects[i].size[1] = data.size[1]
                 } else if (data.tool === "circle") {
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
+                    completedObjects[i].rotation = data.rotation
                     completedObjects[i].radius = data.radius
                 } else if (data.tool === "text") {
                     completedObjects[i].points[0] = data.points[0]
                     completedObjects[i].points[1] = data.points[1]
+                    completedObjects[i].rotation = data.rotation
                     completedObjects[i].text = data.text
                 }
             }
@@ -421,7 +426,6 @@ const Board = () => {
             historyCount.current += 1
         }
     }
-
 
     /* https://konvajs.org/docs/sandbox/Relative_Pointer_Position.html#page-title */
     let groupScale = useRef(1);
@@ -536,7 +540,7 @@ const Board = () => {
     }
 
     const handleCreateCopy = () => {
-        current.emit('createCopy', {session: localStorage.getItem('uniqueID'), whiteboardID: whiteboardID.current, username: localStorage.getItem('username')})
+        current.emit('createCopy', {uniqueID: localStorage.getItem('uniqueID'), whiteboardID: whiteboardID.current, username: localStorage.getItem('username')})
     }
 
     const handleAllowUser = (data) => {
@@ -650,6 +654,7 @@ const Board = () => {
                                                 if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
+                                                    completedObjects[i].rotation = newAttrs.rotation
                                                     completedObjects[i].size[0] = newAttrs.width
                                                     completedObjects[i].size[1] = newAttrs.height
                                                     current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
@@ -673,8 +678,10 @@ const Board = () => {
                                         onChange={(newAttrs) => {
                                             completedObjects.map((object, i) => {
                                                 if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
+                                                    console.log(newAttrs)
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
+                                                    completedObjects[i].rotation = newAttrs.rotation
                                                     completedObjects[i].radius = newAttrs.radius
                                                     current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
                                                     generateHistoryStep()
@@ -699,6 +706,7 @@ const Board = () => {
                                                 if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
+                                                    completedObjects[i].rotation = newAttrs.rotation
                                                     completedObjects[i].text = newAttrs.text
                                                     current.emit('updateObject', {whiteboardID: whiteboardID.current, object: completedObjects[i]});
                                                     generateHistoryStep()

@@ -9,6 +9,7 @@ const BoardText = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) =>
         key:shapeProps.selectID,
         x:shapeProps.points[0],
         y:shapeProps.points[1],
+        rotation:shapeProps.rotation,
         text:shapeProps.text,
         fill:shapeProps.stroke,
         fontFamily:'Calibri',
@@ -111,20 +112,21 @@ const BoardText = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) =>
                 }}
                 onTransformEnd={(e) => {
                     const node = shapeRef.current;
-
-                    // we will reset it back
                     node.scaleX(1);
                     node.scaleY(1);
                     onChange({
                         ...shapeProps,
                         x: node.x(),
                         y: node.y(),
+                        rotation: node.rotation(),
                     });
                 }}
             />
             {isSelected && (
                 <Transformer
                     ref={trRef}
+                    resizeEnabled={false}
+                    rotateEnabled={false}
                 />
             )}
         </React.Fragment>

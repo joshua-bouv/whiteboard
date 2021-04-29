@@ -9,6 +9,7 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove 
         key:shapeProps.selectID,
         x:shapeProps.points[0],
         y:shapeProps.points[1],
+        rotation:shapeProps.rotation,
         width:shapeProps.size[0],
         height:shapeProps.size[1],
         fill:shapeProps.stroke,
@@ -43,17 +44,16 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove 
                     const node = shapeRef.current;
                     const scaleX = node.scaleX();
                     const scaleY = node.scaleY();
-
-                    // we will reset it back
-                    node.scaleX(1);
-                    node.scaleY(1);
                     onChange({
                         ...shapeProps,
                         x: node.x(),
                         y: node.y(),
-                        width: Math.max(5, node.width() * scaleX),
-                        height: Math.max(1, node.height() * scaleY),
+                        rotation: node.rotation(),
+                        width: node.width()*scaleX,
+                        height: node.height()*scaleY,
                     });
+                    node.scaleX(1);
+                    node.scaleY(1);
                 }}
             />
             {isSelected && (

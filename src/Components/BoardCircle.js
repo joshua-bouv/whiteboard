@@ -9,6 +9,7 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) 
         key:shapeProps.selectID,
         x:shapeProps.points[0],
         y:shapeProps.points[1],
+        rotation:shapeProps.rotation,
         radius:shapeProps.radius,
         fill:shapeProps.stroke,
         draggable:onCanMove,
@@ -48,6 +49,7 @@ const BoardCircle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove }) 
                         ...shapeProps,
                         x: node.x(),
                         y: node.y(),
+                        rotation: node.rotation(),
                         radius: Math.max(5, node.radius() * scaleX),
                     });
                 }}
