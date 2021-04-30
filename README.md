@@ -4,6 +4,9 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 ## Technical documentation
 Technical documentation found [here](https://cseegit.essex.ac.uk/ce301_2020/ce301_bouvier_joshua_l_j/-/wikis/home)
 
+## Video demo
+[https://www.youtube.com/watch?v=J1ZBVgXbgzo](https://www.youtube.com/watch?v=J1ZBVgXbgzo)
+
 ## Prerequisites
 * Node.js v21.16.1
 * npm (or yarn) v6.13.4
