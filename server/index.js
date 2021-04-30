@@ -70,14 +70,14 @@ async function main(){
             }
         }
 
-        async function updateObjectOnBoard(board, data) {
+        function updateObjectOnBoard(board, data) {
             try {
                 if (data.tool === "square") {
-                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, rotation: data.rotation, size: data.size}})
+                    whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, rotation: data.rotation, size: data.size}})
                 } else if (data.tool === "circle") { // circle
-                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, rotation: data.rotation, radius: data.radius}})
+                    whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {points: data.points, rotation: data.rotation, radius: data.radius}})
                 } else if (data.tool === "text") {
-                    await whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {text: data.text}})
+                    whiteboards.collection(board).findOneAndUpdate({_id: new ObjectId(data._id)}, {$set: {text: data.text}})
                 }
             } catch (e) {
                 console.error("Error updating object to client")
@@ -102,9 +102,9 @@ async function main(){
             }
         }
 
-        async function undoBoard(board) {
+        function undoBoard(board) {
             try {
-                await whiteboards.collection(board).findOneAndDelete({}, {sort: {_id: -1}})
+                whiteboards.collection(board).findOneAndDelete({}, {sort: {_id: -1}})
             } catch (e) {
                 console.error("Error undoing whiteboard")
                 console.error(e)
@@ -260,6 +260,8 @@ async function main(){
             function addUser(whiteboardID, username) {
                 getWhiteboardData(whiteboardID, function(data) {
                     socket.leaveAll();
+                    socket.join(whiteboardID);
+
                     if (username === null) {
                         username = "guest"
                     }
@@ -267,14 +269,15 @@ async function main(){
                     if (activeWhiteboards[whiteboardID] === undefined) {
                         activeWhiteboards[whiteboardID] = {globalPermission: data.permission, owner: data.owner, userPermission: data.writers}
                     }
+
                     socketCurrentBoard[socket.id] = {whiteboardID: whiteboardID, username: username}
-                    socket.join(whiteboardID);
                     let canDraw = false;
+
                     if (data.writers.includes(username)) {
                         canDraw = true;
                     }
-                    let test = {whiteboardID: whiteboardID, owner:data.owner, permission: data.permission, localPermission: canDraw}
-                    socket.emit('setupWhiteboard', test)
+
+                    socket.emit('setupWhiteboard', {whiteboardID: whiteboardID, owner:data.owner, permission: data.permission, localPermission: canDraw})
                     socket.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                     socket.to(whiteboardID).broadcast.emit('viewersChanged', getUsersViewingWhiteboard(whiteboardID));
                     console.log(username+" connected to whiteboard "+whiteboardID)
@@ -392,7 +395,8 @@ async function main(){
             socket.on('changeGlobalPermission', (data) => {
                 changeGlobalPermission(data)
                 activeWhiteboards[data.whiteboardID].permission = data.newPermission
-                socket.to(data.whiteboardID).broadcast.emit('permissionsChanged', {globalPermission: data.newPermission, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
+                socket.emit('permissionsChanged', {globalPermission: data.newPermission, owner: activeWhiteboards[data.whiteboardID].owner, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
+                socket.to(data.whiteboardID).broadcast.emit('permissionsChanged', {globalPermission: data.newPermission, owner: activeWhiteboards[data.whiteboardID].owner, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
                 let text = "Read-only"
                 if (data.newPermission === "write") {
                     text = "Write"
@@ -406,7 +410,7 @@ async function main(){
                 if (!activeWhiteboards[data.whiteboardID].userPermission.includes(data.username)) {
                     activeWhiteboards[data.whiteboardID].userPermission.push(data.username)
                 }
-                socket.to(data.whiteboardID).broadcast.emit('permissionsChanged', {globalPermission: activeWhiteboards[data.whiteboardID].permission, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
+                socket.to(data.whiteboardID).broadcast.emit('permissionsChanged', {globalPermission: activeWhiteboards[data.whiteboardID].permission, owner: activeWhiteboards[data.whiteboardID].owner, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
                 socket.emit('displayNotification', "Access given to "+data.username)
             })
 
@@ -414,7 +418,7 @@ async function main(){
             socket.on('blockUser', (data) => {
                 removePermissionForUser(data.whiteboardID, data.username)
                 activeWhiteboards[data.whiteboardID].userPermission = activeWhiteboards[data.whiteboardID].userPermission.filter(userPermission => userPermission !== data.username);
-                socket.to(data.whiteboardID).broadcast.emit('permissionsChanged', {globalPermission: activeWhiteboards[data.whiteboardID].permission, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
+                socket.to(data.whiteboardID).broadcast.emit('permissionsChanged', {globalPermission: activeWhiteboards[data.whiteboardID].permission, owner: activeWhiteboards[data.whiteboardID].owner, userPermission: activeWhiteboards[data.whiteboardID].userPermission})
                 socket.emit('displayNotification', "Access removed from "+data.username)
             })
 

@@ -60,7 +60,6 @@ const UserActions = forwardRef((props, ref) => {
     };
 
     const handleChange = (event) => {
-        console.log(props.whiteboardData.owner)
         if (localStorage.getItem('uniqueID') === props.whiteboardData.owner) {
             setPermissions(event.target.value)
             props.changePermissions(event.target.value)

@@ -180,7 +180,12 @@ const Board = () => {
             canEdit = true
         }
 
-        isAllowedToDraw.current = data.globalPermission === 'write' || canEdit;
+        isAllowedToDraw.current = data.globalPermission === 'write' || canEdit || data.owner === localStorage.getItem('uniqueID');
+        setGlobalPermission(data.globalPermission);
+        if (!isAllowedToDraw) {
+            setIsDragging(false);
+            setIsDrawingTool(false);
+        }
     }
 
     const loadWhiteboards = (data) => {
@@ -195,7 +200,8 @@ const Board = () => {
         whiteboardID.current = data.whiteboardID
         sessionStorage.setItem('whiteboardID', data.whiteboardID)
         window.history.replaceState(null, "New Page Title", "/"+whiteboardID.current)
-        isAllowedToDraw.current = data.permission === 'write' || data.localPermission;
+        isAllowedToDraw.current = data.permission === 'write' || data.localPermission || data.owner === localStorage.getItem('uniqueID');
+
         setGlobalPermission(data.permission);
         ownerOfWhiteboard.current = data.owner
     }
@@ -209,6 +215,7 @@ const Board = () => {
     }
 
     const generateHistoryStep = () => {
+        console.log("new history")
         if (historyCount.current !== historicSnapshots.current.length) {
             historicSnapshots.current = historicSnapshots.current.slice(0, historyCount.current)
         }
@@ -522,8 +529,10 @@ const Board = () => {
 
     const handleRedo = () => {
         redoWhiteboard()
-        let latestLine = historicSnapshots.current[historyCount.current-1]
-        current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
+        if (historyCount.current <= historicSnapshots.current.length - 1) {
+            let latestLine = historicSnapshots.current[historyCount.current-1]
+            current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
+        }
     }
 
     const handleJoin = (newWhiteboardID) => {
@@ -678,7 +687,6 @@ const Board = () => {
                                         onChange={(newAttrs) => {
                                             completedObjects.map((object, i) => {
                                                 if (object.selectID === newAttrs.key) { // fix this mess + make tools refresh and pass if is in use
-                                                    console.log(newAttrs)
                                                     completedObjects[i].points[0] = newAttrs.x
                                                     completedObjects[i].points[1] = newAttrs.y
                                                     completedObjects[i].rotation = newAttrs.rotation

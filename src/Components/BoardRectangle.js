@@ -59,11 +59,11 @@ const BoardRectangle = ({ shapeProps, isSelected, onSelect, onChange, onCanMove 
             {isSelected && (
                 <Transformer
                     ref={trRef}
-                    boundBoxFunc={(oldBox, newBox) => {
-                        if (newBox.width < 5 || newBox.height < 5) {
-                            return oldBox;
+                    boundBoxFunc={(oldSize, newSize) => {
+                        if (newSize.width < 1 || newSize.height < 1) {
+                            return oldSize;
                         }
-                        return newBox;
+                        return newSize;
                     }}
                 />
             )}
