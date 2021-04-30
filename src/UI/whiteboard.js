@@ -421,7 +421,6 @@ const Board = () => {
     }
 
     const undoWhiteboard = () => {
-        console.log(historyCount.current)
         if (historyCount.current > 1) {
             historyCount.current -= 1
             setCompletedObjects([...historicSnapshots.current[(historyCount.current) - 1]])
@@ -430,7 +429,6 @@ const Board = () => {
     }
 
     const redoWhiteboardNetwork = (data) => {
-        console.log("b", historyCount.current)
 
         completedObjects.push({...data})
         setCompletedObjects([...completedObjects.concat()])
@@ -439,7 +437,6 @@ const Board = () => {
     }
 
     const redoWhiteboard = () => {
-        console.log("a", historyCount.current)
 
         if (historyCount.current <= historicSnapshots.current.length - 1) {
             setCompletedObjects([...historicSnapshots.current[historyCount.current]])
