@@ -18,8 +18,10 @@ Technical documentation found [here](https://cseegit.essex.ac.uk/ce301_2020/ce30
 * express vlatest
 * socket.io v3.0.4
 * mongodb v3.6.3
-* material-ui ~
-* material-ui-color ~
+* material-ui
+* material-ui-color
+* react-konva
+* notistack
 
 
 ## Getting started
