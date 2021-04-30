@@ -429,15 +429,12 @@ const Board = () => {
     }
 
     const redoWhiteboardNetwork = (data) => {
-
         completedObjects.push({...data})
         setCompletedObjects([...completedObjects.concat()])
-//            setCompletedObjects([...historicSnapshots.current[historyCount.current]])
         generateHistoryStep()
     }
 
     const redoWhiteboard = () => {
-
         if (historyCount.current <= historicSnapshots.current.length - 1) {
             setCompletedObjects([...historicSnapshots.current[historyCount.current]])
             historyCount.current += 1
