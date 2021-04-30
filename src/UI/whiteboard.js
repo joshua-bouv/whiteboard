@@ -215,7 +215,6 @@ const Board = () => {
     }
 
     const generateHistoryStep = () => {
-        console.log("new history")
         if (historyCount.current !== historicSnapshots.current.length) {
             historicSnapshots.current = historicSnapshots.current.slice(0, historyCount.current)
         }
