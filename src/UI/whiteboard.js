@@ -111,6 +111,7 @@ const Board = () => {
     const loadWhiteboardsUI = useRef(null);  // the load whiteboard UI component
     const isAllowedToDraw = useRef(false); // local permission
     const ownerOfWhiteboard = useRef(false);  // owner of whiteboard
+    let historyReached = useRef(true)
 
     const classes = useStyles();
 
@@ -145,7 +146,7 @@ const Board = () => {
         current.on('deleteObject', handleDeleteObject)
         current.on('clearWhiteboard', clearWhiteboard);
         current.on('undoWhiteboard', undoWhiteboard);
-        current.on('redoWhiteboard', redoWhiteboard);
+        current.on('redoWhiteboard', redoWhiteboardNetwork);
         current.on('loggedIn', loggedIn);
         current.on('setupWhiteboard', setupWhiteboard);
         current.on('displayNotification', displayNotification);
@@ -420,13 +421,26 @@ const Board = () => {
     }
 
     const undoWhiteboard = () => {
+        console.log(historyCount.current)
         if (historyCount.current > 1) {
             historyCount.current -= 1
             setCompletedObjects([...historicSnapshots.current[(historyCount.current) - 1]])
+            historyReached.current = true
         }
     }
 
+    const redoWhiteboardNetwork = (data) => {
+        console.log("b", historyCount.current)
+
+        completedObjects.push({...data})
+        setCompletedObjects([...completedObjects.concat()])
+//            setCompletedObjects([...historicSnapshots.current[historyCount.current]])
+        generateHistoryStep()
+    }
+
     const redoWhiteboard = () => {
+        console.log("a", historyCount.current)
+
         if (historyCount.current <= historicSnapshots.current.length - 1) {
             setCompletedObjects([...historicSnapshots.current[historyCount.current]])
             historyCount.current += 1
@@ -524,13 +538,21 @@ const Board = () => {
     const handleUndo = () => {
         undoWhiteboard()
         current.emit('undoWhiteboard', whiteboardID.current);
+        historyReached.current = true
     }
 
     const handleRedo = () => {
         redoWhiteboard()
-        if (historyCount.current <= historicSnapshots.current.length) {
+        if (historyCount.current <= historicSnapshots.current.length-1) {
             let latestLine = historicSnapshots.current[historyCount.current-1]
             current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
+        }
+        if (historyCount.current === historicSnapshots.current.length) {
+            if (historyReached.current) {
+                let latestLine = historicSnapshots.current[historyCount.current-1]
+                current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
+                historyReached.current = false
+            }
         }
     }
 

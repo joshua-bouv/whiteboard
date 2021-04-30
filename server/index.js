@@ -381,7 +381,7 @@ async function main(){
             socket.on('redoWhiteboard', (data) => {
                 data.object['user'] = socket.id;
                 addObjectToBoard(data.whiteboardID, data.object)
-                socket.to(data.whiteboardID).broadcast.emit('redoWhiteboard');
+                socket.to(data.whiteboardID).broadcast.emit('redoWhiteboard', data.object);
             });
 
             // To load a whiteboard
