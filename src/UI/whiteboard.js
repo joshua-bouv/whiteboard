@@ -528,7 +528,7 @@ const Board = () => {
 
     const handleRedo = () => {
         redoWhiteboard()
-        if (historyCount.current <= historicSnapshots.current.length - 1) {
+        if (historyCount.current <= historicSnapshots.current.length) {
             let latestLine = historicSnapshots.current[historyCount.current-1]
             current.emit('redoWhiteboard', {whiteboardID: whiteboardID.current, object: latestLine[latestLine.length-1]});
         }
